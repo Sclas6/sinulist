@@ -1,4 +1,5 @@
 test/
 env/
-settings.yaml
-client_secrets.json
+__pycache__/
+settings.py
+secrets.json

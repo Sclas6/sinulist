@@ -9,23 +9,29 @@ import re
 import ssl
 import dropbox
 import pickle
+import json
 
 app = Flask(__name__)
 
-ACCESS_TOKEN = 'hy3IaBW_jAYAAAAAAAAAAUeLD8njXTAI-y6jX5UDJLwIL0h3GDJSMzSLY1bim26_'
-client = dropbox.Dropbox(ACCESS_TOKEN)
+pic_save_availavle = False
+kaitamono = ''
+sinulist = []
+kaitalist = {}
+okayu = {}
+sec = {}
+with open("secrets.json") as f:
+    sec = json.load(f)
+
+ACCESS_TOKEN = sec["dropbox_token"]
+LINE_ACCESS_TOKEN = sec["line_acc_token"]
+LINE_CHANNEL_SECRET = sec["line_acc_sec"]
 '''
-T_API_KEY = 'zf6sngMdfdVI2zh2sQNrNtv0Q'
-T_API_SEC = 'Naf6Tsq2BvigA0hEArogzzbzlAtEy0oQGXhluUCJvCRSgOTFOg'
-T_ACC_TOKEN = '757848958626476032-8KWFB8PIjHwKMkdjjVu72QZIMtxPN5U'
-T_ACC_SEC = 'pFi5zUjgncX9891r5SEPrKinoHXHw1zsXT5qBLJJZKHXQ'
+T_API_KEY = sec["twitter_api_key"]
+T_API_SEC = sec["twitter_api_sec"]
+T_ACC_TOKEN = sec["twitter_acc_token"]
+T_ACC_SEC = sec["twitter_acc_sec"]
 tweetId='1335593079059873795'
 '''
-pic_save_availavle=False
-kaitamono=''
-sinulist=[]
-kaitalist={}
-okayu={}
 
 def debug_pic1224():
     pass
@@ -35,8 +41,8 @@ def checkls(kakumono):
     juuhuku=False
     for n in range(len(sinulist)):
         if kakumono == sinulist[n]:
-            juuhuku=True
-    if juuhuku==True:
+            juuhuku = True
+    if juuhuku == True:
         return True
     else:
         return False
@@ -48,25 +54,26 @@ def addlist(kakumono):
         pickle.dump(sinulist,f)
 
 def loadfiles():
-    global sinulist,kaitalist,okayu
+    global sinulist, kaitalist, okayu
     if os.path.exists('list.pkl'):
         with open('list.pkl','rb') as f:
-            sinulist=pickle.load(f)
+            sinulist = pickle.load(f)
     if os.path.exists('kaita.pkl'):
         with open('kaita.pkl','rb') as f:
-            kaitalist=pickle.load(f)
+            kaitalist = pickle.load(f)
     if os.path.exists('okayu.pkl'):
         with open('okayu.pkl','rb') as f:
-            okayu=pickle.load(f)
+            okayu = pickle.load(f)
 
 def pic_checkls(content):
     global kaitalist
     for n in kaitalist:
-        if content==n:
+        if content == n:
             return True
     return False
 
 def pic_save(kaitamono,content):
+    client = dropbox.Dropbox(ACCESS_TOKEN)
     global kaitalist
     with open(f'{kaitamono}.jpg','wb') as f:
         for chunk in content.iter_content():
@@ -74,38 +81,40 @@ def pic_save(kaitamono,content):
     #upload
     with open(f'{kaitamono}.jpg','rb') as f:
         client.files_upload(f.read(),f'/{kaitamono}.jpg',mode=dropbox.files.WriteMode.overwrite)
+    #del
+    os.remove(f'{kaitamono}.jpg')
     #create link
     setting = dropbox.sharing.SharedLinkSettings(requested_visibility=dropbox.sharing.RequestedVisibility.public)
     link = client.sharing_create_shared_link_with_settings(path=f'/{kaitamono}.jpg', settings=setting)
     #get link
-    links=client.sharing_list_shared_links(path=f'/{kaitamono}.jpg',direct_only=True).links
+    links = client.sharing_list_shared_links(path=f'/{kaitamono}.jpg',direct_only=True).links
     if links is not None:
         for link in links:
-            url=link.url
-            url=url.replace('www.dropbox','dl.dropboxusercontent').replace('?dl=0','')
-    kaitalist[kaitamono]=url
+            url = link.url
+            url = url.replace('www.dropbox','dl.dropboxusercontent').replace('?dl=0','')
+    kaitalist[kaitamono] = url
     with open('kaita.pkl','wb') as f:
         pickle.dump(kaitalist,f)
 
 def pic_print():
     global kaitalist
     with open('kaita.pkl','rb') as f:
-        kaitalist=pickle.load(f)
-    string=''
-    tmp=True
+        kaitalist = pickle.load(f)
+    string = ''
+    tmp = True
     for n in kaitalist:
-        if tmp==True:
-            string+='  ･{0}'.format(n)
-            tmp=False
+        if tmp == True:
+            string += '  ･{0}'.format(n)
+            tmp = False
         else:
-            string+='\n  ･{0}'.format(n)
+            string += '\n  ･{0}'.format(n)
     return string
 
 def pic_showpic(content):
     global kaitalist
     if os.path.exists('kaita.pkl'):
         with open('kaita.pkl','rb') as f:
-            kaitalist=pickle.load(f)
+            kaitalist = pickle.load(f)
     return kaitalist[content]
 
 def pic_rmlist(kesumono):
@@ -117,13 +126,13 @@ def pic_rmlist(kesumono):
 def printlist():
     global sinulist
     with open('list.pkl','rb') as f:
-        sinulist=pickle.load(f)
-    string=''
+        sinulist = pickle.load(f)
+    string = ''
     for n in range(len(sinulist)):
-        if n==0:
-            string+='  ･{0}'.format(sinulist[n])
+        if n == 0:
+            string += '  ･{0}'.format(sinulist[n])
         else:
-            string+='\n  ･{0}'.format(sinulist[n])
+            string += '\n  ･{0}'.format(sinulist[n])
     return string
 
 def rmlist(kakumono):
@@ -134,37 +143,37 @@ def rmlist(kakumono):
 
 def rmrecent():
     global sinulist
-    str=sinulist[-1]
+    str = sinulist[-1]
     rmlist(sinulist[-1])
     return str
 
 def rmnum(num):
     global sinulist
-    str=sinulist[num-1]
+    str = sinulist[num-1]
     rmlist(sinulist[num-1])
     return str
 
 def commandsplit(line):
-    commandlist=line.splitlines()
+    commandlist = line.splitlines()
     return commandlist
 
 def linesplit(commandlist):
     pc = commandlist.split()
-    command=pc[0]
-    token=''
+    command = pc[0]
+    token = ''
     for n in range(len(pc)):
-        if n==0:
+        if n == 0:
             pass
-        elif n!=len(pc)-1:
-            token+='{0} '.format(pc[n])
+        elif n != len(pc) - 1:
+            token += '{0} '.format(pc[n])
         else:
-            token+='{0}'.format(pc[n])
-    line={'command':command,'token':token}
+            token += '{0}'.format(pc[n])
+    line = {'command':command,'token':token}
     return line
 
 def okayu_up(key,value):
     global okayu
-    okayu[key]=int(value)
+    okayu[key] = int(value)
     with open('okayu.pkl','wb') as f:
         pickle.dump(okayu,f)
 
@@ -178,42 +187,35 @@ def okayu_check(key):
 
 def okayu_diff(key1,key2):
     global okayu
-    result=''
+    result = ''
     if(okayu_num(key1)>okayu_num(key2)):
-        result+=f"WINNER {key1}"
+        result += f"WINNER {key1}"
     elif(okayu_num(key1)<okayu_num(key2)):
-        result+=f"WINNER {key2}"
+        result += f"WINNER {key2}"
     else:
-        result+="DRAW"
+        result += "DRAW"
     return result
 
 def okayu_showall(key):
     global okayu
-    yourscore=okayu_num(key)
-    result=f"{key}({yourscore}草粥)VS\n"
+    yourscore = okayu_num(key)
+    result = f"{key}({yourscore}草粥)VS\n"
     for k in okayu:
-        if(key==k):
+        if(key == k):
             continue
-        result+=f'    {k}({okayu_num(k)}草粥)\n        {okayu_diff(key,k)}\n'
+        result += f'    {k}({okayu_num(k)}草粥)\n        {okayu_diff(key,k)}\n'
     return result
 
 def okayu_del(key):
     global okayu
-    if okayu_check(key)==True:
-        val=okayu.pop(key)
+    if okayu_check(key) == True:
+        val = okayu.pop(key)
         with open('okayu.pkl','wb') as f:
             pickle.dump(okayu,f)
         return val
 
-
-#環境変数取得
-#YOUR_CHANNEL_ACCESS_TOKEN = os.environ["YOUR_CHANNEL_ACCESS_TOKEN"]
-#YOUR_CHANNEL_SECRET = os.environ["YOUR_CHANNEL_SECRET"]
-YOUR_CHANNEL_ACCESS_TOKEN = "bdPJrQlZ4C6pll2rXHHb5OzRWfcpGUOXL/hlbxW8bbh9HpWHuOaojljLYZ0fsRLzrFDoZkDtaMsNF/xKfW97vPGXvt7dSu5vEnstRIlhQWzMnLLDbSOwST8OwmeyAQ8QfBdWY5WZtpF9hSGmMTy4IwdB04t89/1O/w1cDnyilFU="
-YOUR_CHANNEL_SECRET = "2db7ef7dd127c10ce392a04e60304de3"
-
-line_bot_api = LineBotApi(YOUR_CHANNEL_ACCESS_TOKEN)
-handler = WebhookHandler(YOUR_CHANNEL_SECRET)
+line_bot_api = LineBotApi(LINE_ACCESS_TOKEN)
+handler = WebhookHandler(LINE_CHANNEL_SECRET)
 @app.route('/.well-known/acme-challenge/<filename>')
 def well_known(filename):
     return render_template('.well-known/acme-challenge/'+ filename)
@@ -222,17 +224,14 @@ def well_known(filename):
 def callback():
     # get X-Line-Signature header value
     signature = request.headers['X-Line-Signature']
-
     # get request body as text
     body = request.get_data(as_text=True)
     app.logger.info("Request body: " + body)
-
     # handle webhook body
     try:
         handler.handle(body, signature)
     except InvalidSignatureError:
         abort(400)
-
     return 'OK'
 
 @handler.add(JoinEvent)
@@ -404,13 +403,3 @@ def handle_message(event):
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(result.strip()))
-
-if __name__ == "__main__":
-    loadfiles()
-    port = int(os.getenv("PORT", 443))
-    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-    ssl_context.load_cert_chain('/etc/letsencrypt/live/sclas.xyz-0001/fullchain.pem', '/etc/letsencrypt/live/sclas.xyz-0001/privkey.pem')
-    '''HTTP'''
-    #app.run(host="0.0.0.0", port=port)
-    '''HTTPS'''
-    app.run(host = "0.0.0.0", port = port, ssl_context = ssl_context)
