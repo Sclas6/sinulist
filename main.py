@@ -1,60 +1,34 @@
-from flask import Flask, request, abort
-
-from linebot import (
-    LineBotApi, WebhookHandler
-)
-from linebot.exceptions import (
-    InvalidSignatureError
-)
-from linebot.models import (
-    MessageEvent, TextMessage, TextSendMessage, JoinEvent
-)
+from flask import *
+from linebot import LineBotApi, WebhookHandler
+from linebot.exceptions import InvalidSignatureError
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, JoinEvent
 from linebot.models.messages import ImageMessage
 from linebot.models.send_messages import ImageSendMessage
-from requests_oauthlib import OAuth1Session
 import os
-import time
-import requests
+import re
+import ssl
 import dropbox
 import pickle
-import twitter
 
 app = Flask(__name__)
 
-ACCESS_TOKEN=''
-client=dropbox.Dropbox(ACCESS_TOKEN)
-
-with open("list.pkl", "wb") as f:
-    metadata, res = client.files_download(path="/list.pkl")
-    f.write(res.content)
-
-with open("kaita.pkl", "wb") as f:
-    pass
-    metadata, res = client.files_download(path="/kaita.pkl")
-    f.write(res.content)
-
-T_API_KEY=''
-T_API_SEC=''
-T_ACC_TOKEN=''
-T_ACC_SEC=''
-auth = twitter.OAuth(consumer_key=T_API_KEY,
-                    consumer_secret=T_API_SEC,
-                    token=T_ACC_TOKEN,
-                    token_secret=T_ACC_SEC)
-t = twitter.Twitter(auth=auth)
+ACCESS_TOKEN = 'hy3IaBW_jAYAAAAAAAAAAUeLD8njXTAI-y6jX5UDJLwIL0h3GDJSMzSLY1bim26_'
+client = dropbox.Dropbox(ACCESS_TOKEN)
+'''
+T_API_KEY = 'zf6sngMdfdVI2zh2sQNrNtv0Q'
+T_API_SEC = 'Naf6Tsq2BvigA0hEArogzzbzlAtEy0oQGXhluUCJvCRSgOTFOg'
+T_ACC_TOKEN = '757848958626476032-8KWFB8PIjHwKMkdjjVu72QZIMtxPN5U'
+T_ACC_SEC = 'pFi5zUjgncX9891r5SEPrKinoHXHw1zsXT5qBLJJZKHXQ'
 tweetId='1335593079059873795'
-
+'''
 pic_save_availavle=False
 kaitamono=''
 sinulist=[]
 kaitalist={}
-
+okayu={}
 
 def debug_pic1224():
-    with open('kaita.pkl','wb') as f:
-        pickle.dump(kaitalist,f)
-    with open('kaita.pkl','rb') as f:
-        client.files_upload(f.read(),'/kaita.pkl')
+    pass
 
 def checkls(kakumono):
     global sinulist
@@ -69,15 +43,21 @@ def checkls(kakumono):
 
 def addlist(kakumono):
     global sinulist
-    if os.path.exists('list.pkl'):
-        with open('list.pkl','rb') as f:
-            sinulist=pickle.load(f)
     sinulist.append(kakumono)
     with open('list.pkl','wb') as f:
         pickle.dump(sinulist,f)
-    with open('list.pkl','rb') as f:
-        client.files_delete('/list.pkl')
-        client.files_upload(f.read(),'/list.pkl')
+
+def loadfiles():
+    global sinulist,kaitalist,okayu
+    if os.path.exists('list.pkl'):
+        with open('list.pkl','rb') as f:
+            sinulist=pickle.load(f)
+    if os.path.exists('kaita.pkl'):
+        with open('kaita.pkl','rb') as f:
+            kaitalist=pickle.load(f)
+    if os.path.exists('okayu.pkl'):
+        with open('okayu.pkl','rb') as f:
+            okayu=pickle.load(f)
 
 def pic_checkls(content):
     global kaitalist
@@ -88,9 +68,6 @@ def pic_checkls(content):
 
 def pic_save(kaitamono,content):
     global kaitalist
-    if os.path.exists('kaita.pkl'):
-        with open('kaita.pkl','rb') as f:
-            kaitalist=pickle.load(f)
     with open(f'{kaitamono}.jpg','wb') as f:
         for chunk in content.iter_content():
             f.write(chunk)
@@ -109,9 +86,6 @@ def pic_save(kaitamono,content):
     kaitalist[kaitamono]=url
     with open('kaita.pkl','wb') as f:
         pickle.dump(kaitalist,f)
-    with open('kaita.pkl','rb') as f:
-        client.files_delete('/kaita.pkl')
-        client.files_upload(f.read(),'/kaita.pkl')
 
 def pic_print():
     global kaitalist
@@ -136,22 +110,14 @@ def pic_showpic(content):
 
 def pic_rmlist(kesumono):
     global kaitalist
-    if os.path.exists('kaita.pkl'):
-        with open('kaita.pkl','rb') as f:
-            kaitalist=pickle.load(f)
     kaitalist.pop(kesumono)
     with open('kaita.pkl','wb') as f:
         pickle.dump(kaitalist,f)
-    with open('kaita.pkl','rb') as f:
-        client.files_delete('/kaita.pkl')
-        client.files_upload(f.read(),'/kaita.pkl')
-        client.files_delete(f'/{kesumono}.jpg')
 
 def printlist():
     global sinulist
     with open('list.pkl','rb') as f:
         sinulist=pickle.load(f)
-    #string='{0}'.format(sinulist)
     string=''
     for n in range(len(sinulist)):
         if n==0:
@@ -162,30 +128,18 @@ def printlist():
 
 def rmlist(kakumono):
     global sinulist
-    if os.path.exists('list.pkl'):
-        with open('list.pkl','rb') as f:
-            sinulist=pickle.load(f)
     sinulist.remove(kakumono)
     with open('list.pkl','wb') as f:
         pickle.dump(sinulist,f)
-    with open('list.pkl','rb') as f:
-        client.files_delete('/list.pkl')
-        client.files_upload(f.read(),'/list.pkl')
 
 def rmrecent():
     global sinulist
-    if os.path.exists('list.pkl'):
-        with open('list.pkl','rb') as f:
-            sinulist=pickle.load(f)
     str=sinulist[-1]
     rmlist(sinulist[-1])
     return str
 
 def rmnum(num):
     global sinulist
-    if os.path.exists('list.pkl'):
-        with open('list.pkl','rb') as f:
-            sinulist=pickle.load(f)
     str=sinulist[num-1]
     rmlist(sinulist[num-1])
     return str
@@ -196,7 +150,6 @@ def commandsplit(line):
 
 def linesplit(commandlist):
     pc = commandlist.split()
-    tokenCount=len(pc)
     command=pc[0]
     token=''
     for n in range(len(pc)):
@@ -209,40 +162,61 @@ def linesplit(commandlist):
     line={'command':command,'token':token}
     return line
 
-        #TWITTER_API
-def createTweet(kakumono):
-    status='@hyorohyoro66 {0}'.format(kakumono)
-    data=t.statuses.update(status=status,in_reply_to_status_id=tweetId)
-    time.sleep(5)
-    #print(data['id_str'])
-    url = "https://api.twitter.com/1.1/favorites/create.json"
-    api=OAuth1Session(T_API_KEY,T_API_SEC,T_ACC_TOKEN,T_ACC_SEC)
-    id=data['id_str']
-    params={'id':id}
-    api.post(url,params=params)
+def okayu_up(key,value):
+    global okayu
+    okayu[key]=int(value)
+    with open('okayu.pkl','wb') as f:
+        pickle.dump(okayu,f)
 
-def destroyTweet(id):
-    t.statuses.destroy(id=id)
+def okayu_num(key):
+    global okayu
+    return int(okayu[key])
 
-def remDestroy(kesumono):
-    for tweet in t.favorites.list(screen_name='sinulist',count=200):
-        tweet_obj=tweet
-        if 'hyorohyoro66' in str(tweet_obj):
-            #print(tweet_obj['text'])
-            if kesumono in str(tweet_obj):
-                try:
-                    destroyTweet(tweet_obj['id'])
-                except:
-                    pass
-        else:
-            pass
+def okayu_check(key):
+    global okayu
+    return key in okayu.keys()
+
+def okayu_diff(key1,key2):
+    global okayu
+    result=''
+    if(okayu_num(key1)>okayu_num(key2)):
+        result+=f"WINNER {key1}"
+    elif(okayu_num(key1)<okayu_num(key2)):
+        result+=f"WINNER {key2}"
+    else:
+        result+="DRAW"
+    return result
+
+def okayu_showall(key):
+    global okayu
+    yourscore=okayu_num(key)
+    result=f"{key}({yourscore}草粥)VS\n"
+    for k in okayu:
+        if(key==k):
+            continue
+        result+=f'    {k}({okayu_num(k)}草粥)\n        {okayu_diff(key,k)}\n'
+    return result
+
+def okayu_del(key):
+    global okayu
+    if okayu_check(key)==True:
+        val=okayu.pop(key)
+        with open('okayu.pkl','wb') as f:
+            pickle.dump(okayu,f)
+        return val
+
 
 #環境変数取得
-YOUR_CHANNEL_ACCESS_TOKEN = os.environ["YOUR_CHANNEL_ACCESS_TOKEN"]
-YOUR_CHANNEL_SECRET = os.environ["YOUR_CHANNEL_SECRET"]
+#YOUR_CHANNEL_ACCESS_TOKEN = os.environ["YOUR_CHANNEL_ACCESS_TOKEN"]
+#YOUR_CHANNEL_SECRET = os.environ["YOUR_CHANNEL_SECRET"]
+YOUR_CHANNEL_ACCESS_TOKEN = "bdPJrQlZ4C6pll2rXHHb5OzRWfcpGUOXL/hlbxW8bbh9HpWHuOaojljLYZ0fsRLzrFDoZkDtaMsNF/xKfW97vPGXvt7dSu5vEnstRIlhQWzMnLLDbSOwST8OwmeyAQ8QfBdWY5WZtpF9hSGmMTy4IwdB04t89/1O/w1cDnyilFU="
+YOUR_CHANNEL_SECRET = "2db7ef7dd127c10ce392a04e60304de3"
 
 line_bot_api = LineBotApi(YOUR_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(YOUR_CHANNEL_SECRET)
+@app.route('/.well-known/acme-challenge/<filename>')
+def well_known(filename):
+    return render_template('.well-known/acme-challenge/'+ filename)
 
 @app.route("/callback", methods=['POST'])
 def callback():
@@ -263,106 +237,102 @@ def callback():
 
 @handler.add(JoinEvent)
 def join_event(event):
-    str_join='I am @hyorohyoro66 !!!!!!!'
+    str_join = 'I am @hyorohyoro66 !!!!!!!'
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(str_join))
 
-@handler.add(MessageEvent,message=ImageMessage)
+@handler.add(MessageEvent, message=ImageMessage)
 def handle_image(event):
     global pic_save_availavle
     global kaitamono
-    text=''
-    if pic_save_availavle==True:
-        message_id=event.message.id
+    text = ''
+    if pic_save_availavle == True:
+        message_id = event.message.id
         messege_content=line_bot_api.get_message_content(message_id)
-        pic_save(kaitamono,messege_content)
-        pic_save_availavle=False
-        text=f'{kaitamono}を保存しました!'
+        pic_save(kaitamono, messege_content)
+        pic_save_availavle = False
+        text = f'{kaitamono}を保存しました!'
         line_bot_api.push_message(event.source.group_id,TextSendMessage(text))
-        remDestroy(kaitamono)
         rmlist(kaitamono)
-        text='死ぬまでには描くものリストから{0}を削除しました!'.format(kaitamono)
+        text = '死ぬまでには描くものリストから{0}を削除しました!'.format(kaitamono)
         line_bot_api.push_message(event.source.group_id,TextSendMessage(text))
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    result=''
-    oneshot=False
-    message_send=False
+    result = ''
+    oneshot = False
+    message_send = False
     global pic_save_availavle
     global kaitamono
-    linelist=commandsplit(event.message.text)
-    while len(linelist)!=0 and oneshot==False:
-        line=linelist.pop(0)
-        comset=linesplit(line)
-        command=comset['command']
-        token=comset['token']
-        hastoken=False if token=='' else True
-        isNotCommand=False
+    linelist = commandsplit(event.message.text)
+    while len(linelist) != 0 and oneshot == False:
+        line = linelist.pop(0)
+        comset = linesplit(line)
+        command = comset['command']
+        token = comset['token']
+        hastoken = False if token == '' else True
+        isNotCommand = False
 
         #groupid=line_bot_api.get_profile(event.source.group_id)
 
-        if (command=='show' or command=='死ぬまでには描くものリスト'):
-            oneshot=True
-            result+='死ぬまでには描くものリスト\n(クオリティは問わないものとする)\n{0}\n'.format(printlist())
+        if (command == 'show' or command == '描くもの'):
+            oneshot = True
+            result += '死ぬまでには描くものリスト\n(クオリティは問わないものとする)\n{0}\n'.format(printlist())
 
-        elif command=='add' and hastoken==True:
-            kakumono=token
-            if checkls(kakumono)==True:
-                result+='{0}は既に存在しています!\n'.format(kakumono)
+        elif command == 'add' and hastoken == True:
+            kakumono = token
+            if checkls(kakumono) == True:
+                result += '{0}は既に存在しています!\n'.format(kakumono)
             else:
-                result+='死ぬまでには描くものリストに{0}を追加しました!\n'.format(kakumono)
-                status='@hyorohyoro66 {0}'.format(token)
-                createTweet(kakumono)
+                result += '死ぬまでには描くものリストに{0}を追加しました!\n'.format(kakumono)
+                status = '@hyorohyoro66 {0}'.format(token)
                 addlist(kakumono)
-        elif command=='remove' or command=='delete' or command=='rm':
-            if hastoken==True:
+        elif command == 'remove' or command == 'delete' or command == 'rm' or command == "削除":
+            if hastoken == True:
                 try:
-                    if token.isdecimal()==True:
-                        tokennum=int(token)
-                        kesumono=rmnum(tokennum)
-                        str='死ぬまでには描くものリストから{0}を削除しました!\n'.format(kesumono)
-                        remDestroy(kesumono)
+                    if token.isdecimal() == True:
+                        tokennum = int(token)
+                        kesumono = rmnum(tokennum)
+                        str = '死ぬまでには描くものリストから{0}を削除しました!\n'.format(kesumono)
                     else:
-                        kesumono=token
-                        str='死ぬまでには描くものリストから{0}を削除しました!\n'.format(kesumono)
-                        remDestroy(kesumono)
+                        kesumono = token
+                        str = '死ぬまでには描くものリストから{0}を削除しました!\n'.format(kesumono)
                         rmlist(kesumono)
                 except ValueError as error:
-                    str='{0}は存在しません!\n'.format(kesumono)
-                result+=str
+                    str = '{0}は存在しません!\n'.format(kesumono)
+                result += str
             else:
-                oneshot=True
-                kesumono=rmrecent()
-                str='死ぬまでには描くものリストから{0}を削除しました!\n'.format(kesumono)
-                remDestroy(kesumono)
-                result+=str
+                oneshot = True
+                kesumono = rmrecent()
+                str = '死ぬまでには描くものリストから{0}を削除しました!\n'.format(kesumono)
+                result += str
     #Picture Command
-        elif command=='plist' or command=='picls' or command=='pshow':
-            oneshot=True
-            result+='描いたものリスト\n{0}\n'.format(pic_print())
-        elif (command=='save' or command=='comp' or command=='complete') and hastoken==True:
+        elif (command == 'plist' or command == 'picls' or command == 'pshow' or command == "描いたもの") and hastoken==False:
+            oneshot = True
+            result += '描いたものリスト\n{0}\n'.format(pic_print())
+        elif (command == 'save' or command == 'comp' or command == 'complete' or command == '保存') and hastoken==True:
             #oneshot=True
-            if checkls(token)==False:
+            loadfiles()
+            if checkls(token) == False:
                 result+='{0}は死ぬまでに描くものリストに存在しません!\n'.format(token)
             else:
-                if pic_checkls(token)==True:
+                if pic_checkls(token) == True:
                     result+='{0}は既に存在しています!\n'.format(token)
                 else:
-                    pic_save_availavle=True
-                    kaitamono=token
-                    result+='{0}を保存します!\n画像を送信して下さい\n'.format(token)
-        elif (command=='pic' or command=='showpic') and hastoken==True:
-            oneshot=True
-            haserror=False
+                    pic_save_availavle = True
+                    kaitamono = token
+                    result += '{0}を保存します!\n画像を送信して下さい\n'.format(token)
+        elif (command == 'pic' or command == 'showpic' or command == "見せて") and hastoken == True:
+            oneshot = True
+            haserror = False
             try:
-                url=pic_showpic(token)
+                url = pic_showpic(token)
             except KeyError as error:
-                result+='{0}は存在しません!\n'.format(token)
-                haserror=True
-            if haserror!=True:
-                message_send=True
+                result += '{0}は存在しません!\n'.format(token)
+                haserror = True
+            if haserror != True:
+                message_send = True
                 line_bot_api.reply_message(
                     event.reply_token,
                     ImageSendMessage(
@@ -370,42 +340,77 @@ def handle_message(event):
                         original_content_url=url
                     )
                 )
-        elif (command=='prm' or command=='pdelete' or command=='premove' or command=='picrm')and hastoken==True:
-            if pic_checkls(token)==True:
+        elif (command == 'prm' or command == 'pdelete' or command == '画像削除' or command == 'picrm')and hastoken == True:
+            if pic_checkls(token) == True:
                 pic_rmlist(token)
-                result+='{0}の画像を削除しました!\n'.format(token)
+                result += '{0}の画像を削除しました!\n'.format(token)
             else:
-                result+='{0}は存在しません!\n'.format(token)
-        elif command=='debug':
+                result += '{0}は存在しません!\n'.format(token)
+        elif command == 'okayurm':
                 #debug_pic1224()
-                pass
+                result += f"removed {okayu_del(token)}"
 
-        elif command=='名取さなしりとり':
-            message_send=True
+        elif command == "debug":
+            debug_pic1224()
+            result += "debug"
+
+        elif command == '名取さなしりとり':
+            message_send = True
             line_bot_api.reply_message(
                 event.reply_token,
                 TextSendMessage('名取さな'))
 
-        elif command=='test':
+        elif command == 'test':
             kakumono=token
             '''
             payload={'value1':'@hyorohyoro66 \n{0}'.format(token)}
             requests.post(WEB_HOOK_URL,data=payload)
             '''
-            message_send=True
+            message_send = True
             line_bot_api.reply_message(
                 event.reply_token,
                 TextSendMessage(event.source.group_id))
 
-        else:
-            isNotCommand=True
+        elif( command == "okayu" or command == "おかゆ") and (hastoken == False):
+            result += "https://shindanmaker.com/957861"
+            oneshot = True
 
-    if isNotCommand==False and message_send==False:
+        elif (re.match('[0-9]{1,3}草粥',command)):
+            message_send = True
+            oneshot = True
+            profile = line_bot_api.get_profile(event.source.user_id)
+            okayu_up(profile.display_name,re.sub(r"\D", "", command))
+
+        elif (command == "battle" and hastoken==True):
+            oneshot = True
+            profile = line_bot_api.get_profile(event.source.user_id)
+            if token == 'everyone':
+                result += okayu_showall(profile.display_name)
+            else:
+                if okayu_check(token) == False:
+                    result += f'{token}は1d100草粥をプレイしていません!\n'
+                else:
+                    result += f'{profile.display_name}({okayu_num(profile.display_name)}草粥) VS {token}({okayu_num(token)}草粥)\n'
+                    if(okayu_num(profile.display_name)>okayu_num(token)):
+                        result += f'WINNER {profile.display_name}\n'
+                    elif(okayu_num(profile.display_name)<okayu_num(token)):
+                        result += f'WINNER {token}\n'
+                    else:
+                        result += 'DRAW\n'
+        else:
+            isNotCommand = True
+
+    if isNotCommand == False and message_send == False:
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(result.strip()))
 
 if __name__ == "__main__":
-#    app.run()
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    loadfiles()
+    port = int(os.getenv("PORT", 443))
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+    ssl_context.load_cert_chain('/etc/letsencrypt/live/sclas.xyz-0001/fullchain.pem', '/etc/letsencrypt/live/sclas.xyz-0001/privkey.pem')
+    '''HTTP'''
+    #app.run(host="0.0.0.0", port=port)
+    '''HTTPS'''
+    app.run(host = "0.0.0.0", port = port, ssl_context = ssl_context)
