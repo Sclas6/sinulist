@@ -1,7 +1,7 @@
 from flask import *
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage, JoinEvent
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, JoinEvent, FlexSendMessage
 from linebot.models.messages import ImageMessage
 from linebot.models.send_messages import ImageSendMessage
 import os
@@ -32,6 +32,25 @@ T_ACC_TOKEN = sec["twitter_acc_token"]
 T_ACC_SEC = sec["twitter_acc_sec"]
 tweetId='1335593079059873795'
 '''
+def gen_json(contents, title):
+    content_num = 0
+    contains = 10
+    content = '{"type":"carousel","contents":['
+    content_size = len(contents)
+    pages = int(content_size / contains) + 1
+    for i in range(1, pages if contains == 1 else pages + 1):
+        content += '{"type":"bubble","header":{"type":"box","layout":"vertical","contents":[{"type":"text","text":"'
+        content += f"{title} {i}/{pages}"
+        content += '","size": "xxl"}]},"body":{"type":"box","layout":"vertical","spacing": "sm","contents":[{"type":"text","wrap":true,"weight":"regular","size":"md","text":"'
+        for j in range(contains):
+            content += rf"・ {contents[content_num]}\n"
+            content_num += 1
+            if content_num >= content_size:
+                break
+        content += '","maxLines": 20}]}},'
+    content = content[:-1]
+    content += ']}'
+    return json.loads(content)
 
 def debug_pic1224():
     pass
@@ -259,6 +278,7 @@ def handle_image(event):
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
+    loadfiles()
     result = ''
     oneshot = False
     message_send = False
@@ -277,7 +297,15 @@ def handle_message(event):
 
         if (command == 'show' or command == '描くもの'):
             oneshot = True
-            result += '死ぬまでには描くものリスト\n(クオリティは問わないものとする)\n{0}\n'.format(printlist())
+            message_send = True
+            #result += '死ぬまでには描くものリスト\n(クオリティは問わないものとする)\n{0}\n'.format(printlist())
+            line_bot_api.reply_message(
+                event.reply_token,
+                FlexSendMessage(
+                    alt_text='描くものリスト',
+                    contents=gen_json(sinulist, "描くもの")
+                )
+            )
 
         elif command == 'add' and hastoken == True:
             kakumono = token
@@ -308,6 +336,22 @@ def handle_message(event):
                 result += str
     #Picture Command
         elif (command == 'plist' or command == 'picls' or command == 'pshow' or command == "描いたもの") and hastoken==False:
+            oneshot = True
+            message_send = True
+            '''
+            tmp = []
+            for n in kaitamono:
+                tmp.append(kaitalist)
+            '''
+            #result += '描いたものリスト\n{0}\n'.format(pic_print())
+            line_bot_api.reply_message(
+                event.reply_token,
+                FlexSendMessage(
+                    alt_text='描くものリスト',
+                    contents=gen_json(list(kaitalist.keys()), "描いたもの")
+                )
+            )
+        elif (command == 'plist_raw' or command == 'picls_raw' or command == 'pshow_raw' or command == "描いたもの_raw") and hastoken==False:
             oneshot = True
             result += '描いたものリスト\n{0}\n'.format(pic_print())
         elif (command == 'save' or command == 'comp' or command == 'complete' or command == '保存') and hastoken==True:
