@@ -15,17 +15,22 @@ from bs4 import BeautifulSoup as bs
 import matplotlib.pyplot as plt
 import japanize_matplotlib
 import pandas as pd
+import datetime
+import time
 
 app = Flask(__name__)
 
 pic_save_availavle = False
 kaitamono = ''
+memo = ""
 sinulist = []
 kaitalist = {}
 okayu = {}
 sec = {}
 with open("secrets.json") as f:
     sec = json.load(f)
+
+img_name = ""
 
 ACCESS_TOKEN = sec["dropbox_token"]
 LINE_ACCESS_TOKEN = sec["line_acc_token"]
@@ -38,11 +43,36 @@ T_ACC_SEC = sec["twitter_acc_sec"]
 tweetId='1335593079059873795'
 '''
 
-def gen_dragons_json():
-    data = gen_dragons_info()
-    content = '{"type": "bubble","hero": {"type": "image","url": '
+def set_image_name(name):
+    global img_name
+    img_name = name
+
+def set_memo(text):
+    global memo
+    memo = text
+    with open('memo.pkl','wb') as f:
+        pickle.dump(memo,f)
+
+def organize_files():
+    files = os.listdir("img")
+    print(files)
+
+    for i, file in enumerate(sorted(files, reverse = True)):
+        if i >= 10: os.remove(f"img/{file}")
+
+def gen_dragons_json(team):
+    if team == "dragons":
+        data = gen_dragons_info()
+    elif team == "mlb_angels":
+        data = gen_mlb_info("angels")
+    elif team == "mlb_dodgers":
+        data = gen_mlb_info("dodgers")
+    else : data = gen_dragons_info()
+    content = '{"type": "bubble","hero": {"type":"box","layout":"vertical","contents":[{"type": "image","url": '
     content += f'"{data["url"]}"'
-    content +=  ',"size": "full","aspectRatio": "20:13","aspectMode": "fit"},"body": {"type": "box","layout": "vertical","contents": [{"type": "text","text":'
+    content +=  ',"size": "full","aspectRatio": "5:1","aspectMode": "cover"}],"height":"68px","backgroundColor": '
+    content += f'"{data["color"]}"'
+    content += '},"body": {"type": "box","layout": "vertical","contents": [{"type": "text","text":'
     content += f'"{data["teams"]}"'
     content += ',"weight": "bold","size": "xl"},{"type": "box","layout": "vertical","margin": "md","contents": [{"type": "text","text": '
     content += f'"{data["data"]}"'
@@ -52,6 +82,70 @@ def gen_dragons_json():
     content += f'"{data["now"]}"'
     content += ',"wrap": true,"color": "#666666","size": "sm","flex": 5}]}]}]}}'
     return json.loads(content)
+
+def gen_mlb_info(team):
+    load_url = f"https://www.mlb.com/{team}/scores"
+    html = requests.get(load_url)
+    soup = bs(html.content, "html.parser")
+    score_data = soup.find(class_ = re.compile('^tablestyle__StyledTable'))
+
+    teams = [element.text for i, element in enumerate(soup.find_all(class_ = re.compile('^TeamWrappersstyle__DesktopTeamWrapper'))) if i < 2]
+    score_team_1 = [(int)(element.text) for element in score_data.find_all(id = re.compile(".*row-0")) if element.text.isdigit()]
+    score_team_2 = [(int)(element.text) for element in score_data.find_all(id = re.compile(".*row-1")) if element.text.isdigit()]
+    sum_team_1 = sum(score_team_1)
+    sum_team_2 = sum(score_team_2)
+    status = soup.find(class_ = re.compile('^StatusLayerstyle__GameStateWrapper')).text
+    data = re.search("[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}", str(soup.find(class_ = re.compile("^datePickerstyle__InputWrapper")))).group()
+    data = datetime.datetime.strptime(data, "%m/%d/%Y").strftime("%a %b %d").upper()
+    now = 0
+
+    if (len(score_team_1) != len(score_team_2)):
+        now = len(score_team_1)
+        score_team_2.append("" if status != "Final" else 'X')
+    else: now = -1 * len(score_team_1)
+
+    if(status == "Final"):
+        if(len(score_team_1) != len(score_team_2)):
+            score_team_2.append("X")
+    else:
+        for i in range(9 - len(score_team_1)):
+            score_team_1.append("")
+        for i in range(9 - len(score_team_2)):
+            score_team_2.append("")
+
+    score_team_1.append(sum_team_1)
+    score_team_2.append(sum_team_2)
+
+    if team == "dodgers":
+        color_back = "#004680"
+    else:
+        color_back = "#862633"
+    color_text = "#cccccc"
+
+    df = pd.DataFrame({teams[0]: score_team_1, teams[1]: score_team_2}, index=[i + 1 if i != len(score_team_1) - 1 else "計" for i in range(len(score_team_1))]).T
+    fig, ax = plt.subplots(figsize=(5,1))
+    fig.patch.set_facecolor(color_back)
+
+    ax.axis("off")
+    tb = ax.table(
+        cellText=df.values, colLabels=df.columns, rowLabels=teams,
+        loc = "center", cellLoc='center'
+        )
+    tb.scale(1, 1.4)
+    for cell in tb.properties()['children']:
+        cell.get_text().set_color('white')
+        cell.set_edgecolor("white")
+        cell.set_facecolor(color_back)
+
+    for i in range(len(score_team_1)):
+        tb[0, i].set_color(color_back)
+        tb[0, i].set_text_props(color = color_text)
+    plt.subplots_adjust(wspace=0.4)
+    set_image_name(str(time.time()).replace('.', '').ljust(17, '0'))
+    plt.savefig(f"img/{img_name}", facecolor = fig.get_facecolor(), dpi = 500, bbox_inches='tight', pad_inches=0.25)
+    organize_files()
+
+    return {"url":f"https://sclas.xyz/img/{img_name}.png", "teams":(f"{teams[0]} VS {teams[1]}"), "data": data, "status": status, "now": (("TOP " if now >= 0 else "BOT ") + f"{abs(now)} " + (teams[0] if now >= 0 else teams[1])), "color": color_back}
 
 def gen_dragons_info():
     load_url = "https://dragons.jp/game/scoreboard/"
@@ -108,24 +202,11 @@ def gen_dragons_info():
         tb[0, i].set_color(color_back)
         tb[0, i].set_text_props(color = color_text)
     plt.subplots_adjust(wspace=0.4)
-    plt.savefig("score", facecolor = fig.get_facecolor(), dpi = 500, bbox_inches='tight', pad_inches=0.1)
+    set_image_name(str(time.time()).replace('.','').ljust(17, '0'))
+    plt.savefig(f"img/{img_name}", facecolor = fig.get_facecolor(), dpi = 500, bbox_inches='tight', pad_inches=0.25)
+    organize_files()
 
-    return {"url": save_dragons_score(), "teams":(f"{teams[0]} VS {teams[1]}"), "data": data, "status": status, "now": (f"{abs(now)}回" + ("表 " if now >= 0 else "裏 ") + (teams[0] if now >= 0 else teams[1]) + "の攻撃")}
-
-def save_dragons_score():
-    ACCESS_TOKEN = "hy3IaBW_jAYAAAAAAAAAAUeLD8njXTAI-y6jX5UDJLwIL0h3GDJSMzSLY1bim26_"
-    client = dropbox.Dropbox(ACCESS_TOKEN)
-    client.files_delete('/score.png')
-    with open("score.png", "rb") as f:
-        client.files_upload(f.read(), "/score.png", mode = dropbox.files.WriteMode('overwrite'))
-    setting = dropbox.sharing.SharedLinkSettings(requested_visibility = dropbox.sharing.RequestedVisibility.public)
-    link = client.sharing_create_shared_link_with_settings(path = "/score.png", settings = setting)
-    links = client.sharing_list_shared_links(path = "/score.png", direct_only = True).links
-    if links is not None:
-        for link in links:
-            url = link.url
-            url = url.replace('www.dropbox','dl.dropboxusercontent').replace('?dl=0','')
-    return url
+    return {"url": f"https://sclas.xyz/img/{img_name}.png", "teams":(f"{teams[0]} VS {teams[1]}"), "data": data, "status": status, "now": (f"{abs(now)}回" + ("表 " if now >= 0 else "裏 ") + (teams[0] if now >= 0 else teams[1]) + "の攻撃"), "color": color_back}
 
 def gen_json(contents, title):
     content_num = 0
@@ -168,7 +249,7 @@ def addlist(kakumono):
         pickle.dump(sinulist,f)
 
 def loadfiles():
-    global sinulist, kaitalist, okayu
+    global sinulist, kaitalist, okayu, memo
     if os.path.exists('list.pkl'):
         with open('list.pkl','rb') as f:
             sinulist = pickle.load(f)
@@ -178,6 +259,9 @@ def loadfiles():
     if os.path.exists('okayu.pkl'):
         with open('okayu.pkl','rb') as f:
             okayu = pickle.load(f)
+    if os.path.exists('memo.pkl'):
+        with open('memo.pkl','rb') as f:
+            memo = pickle.load(f)
 
 def pic_checkls(content):
     global kaitalist
@@ -334,6 +418,17 @@ handler = WebhookHandler(LINE_CHANNEL_SECRET)
 def well_known(filename):
     return render_template('.well-known/acme-challenge/'+ filename)
 
+@app.route("/")
+def hello():
+    return "Sinulist Server Status: ONLINE"
+
+@app.route("/img/<string:path>")
+def send_image(path):
+    path = f"img/{path}"
+    if os.path.isfile(path):
+        return send_file(path)
+    else: return "File not exists"
+
 @app.route("/callback", methods=['POST'])
 def callback():
     # get X-Line-Signature header value
@@ -406,14 +501,42 @@ def handle_message(event):
         elif (command == 'ドラゴンズ' or command == '中日'):
             oneshot = True
             message_send = True
-            #result += '死ぬまでには描くものリスト\n(クオリティは問わないものとする)\n{0}\n'.format(printlist())
             line_bot_api.reply_message(
                 event.reply_token,
                 FlexSendMessage(
                     alt_text='中日速報',
-                    contents=gen_dragons_json()
+                    contents=gen_dragons_json("dragons")
                 )
             )
+
+        elif (command == 'エンゼルス' or command == 'エンジェルス'):
+            oneshot = True
+            message_send = True
+            line_bot_api.reply_message(
+                event.reply_token,
+                FlexSendMessage(
+                    alt_text='エンゼルス速報',
+                    contents=gen_dragons_json("mlb_angels")
+                )
+            )
+
+        elif (command == 'ドジャース' or command == 'ドジャーズ'):
+            oneshot = True
+            message_send = True
+            line_bot_api.reply_message(
+                event.reply_token,
+                FlexSendMessage(
+                    alt_text='ドジャース速報',
+                    contents=gen_dragons_json("mlb_dodgers")
+                )
+            )
+
+        elif command == 'メモ':
+            if hastoken == True:
+                set_memo(token)
+                result += "メモに保存しました!\n"
+            else:
+                result += memo
 
         elif command == 'add' and hastoken == True:
             kakumono = token
@@ -555,4 +678,3 @@ def handle_message(event):
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(result.strip()))
-

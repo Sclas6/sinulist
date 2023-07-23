@@ -1,5 +1,6 @@
 test/
-env/
+.venv/
 __pycache__/
+img/
 settings.py
 secrets.json
