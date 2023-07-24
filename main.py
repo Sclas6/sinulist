@@ -55,8 +55,6 @@ def set_memo(text):
 
 def organize_files():
     files = os.listdir("img")
-    print(files)
-
     for i, file in enumerate(sorted(files, reverse = True)):
         if i >= 10: os.remove(f"img/{file}")
 
@@ -424,10 +422,14 @@ def hello():
 
 @app.route("/img/<string:path>")
 def send_image(path):
-    path = f"img/{path}"
-    if os.path.isfile(path):
-        return send_file(path)
-    else: return "File not exists"
+    dir = "img/"
+    path = os.path.relpath(f"{os.getcwd()}/{dir}{path}")
+    if os.path.commonprefix([dir, path]) == dir:
+        if os.path.isfile(path):
+            print("OK")
+            return send_file(path)
+        else: return "File not exists"
+    else: return "Operation not allowed"
 
 @app.route("/callback", methods=['POST'])
 def callback():
