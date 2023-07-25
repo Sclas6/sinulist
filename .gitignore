@@ -1,6 +1,7 @@
 test/
 .venv/
-__pycache__/
 img/
+__pycache__/
 settings.py
-secrets.json
+sec.py
+*.pkl
