@@ -33,7 +33,8 @@ def gen_score_json(team):
     return json.loads(content)
 
 def gen_mlb_info(team):
-    load_url = f"https://www.mlb.com/{team}/scores"
+    #load_url = f"https://www.mlb.com/{team}/scores"
+    load_url = "https://www.mlb.com/angels/scores/2023-07-26"
     html = requests.get(load_url)
     soup = bs(html.content, "html.parser")
     score_data = soup.find(class_ = re.compile('^tablestyle__StyledTable'))
@@ -41,9 +42,12 @@ def gen_mlb_info(team):
     teams = [element.text for i, element in enumerate(soup.find_all(class_ = re.compile('^TeamWrappersstyle__DesktopTeamWrapper'))) if i < 2]
     score_team_1 = [(int)(element.text) for element in score_data.find_all(id = re.compile(".*row-0")) if element.text.isdigit()]
     score_team_2 = [(int)(element.text) for element in score_data.find_all(id = re.compile(".*row-1")) if element.text.isdigit()]
+    status = soup.find(class_ = re.compile('^StatusLayerstyle__GameStateWrapper')).text
+    if status == "Postponed":
+        score_team_1.clear()
+        score_team_2.clear()
     sum_team_1 = sum(score_team_1)
     sum_team_2 = sum(score_team_2)
-    status = soup.find(class_ = re.compile('^StatusLayerstyle__GameStateWrapper')).text
     data = re.search("[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}", str(soup.find(class_ = re.compile("^datePickerstyle__InputWrapper")))).group()
     data = datetime.datetime.strptime(data, "%m/%d/%Y").strftime("%a %b %d").upper()
     now = 0
