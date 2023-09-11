@@ -33,8 +33,8 @@ def gen_score_json(team):
     return json.loads(content)
 
 def gen_mlb_info(team):
-    #load_url = f"https://www.mlb.com/{team}/scores"
-    load_url = "https://www.mlb.com/angels/scores/2023-07-26"
+    load_url = f"https://www.mlb.com/{team}/scores"
+    #load_url = "https://www.mlb.com/angels/scores/2023-07-26"
     html = requests.get(load_url)
     soup = bs(html.content, "html.parser")
     score_data = soup.find(class_ = re.compile('^tablestyle__StyledTable'))
@@ -108,7 +108,7 @@ def gen_dragons_info():
 
     teams = [element.text.strip() for element in score_data.find_all("img", alt = "")]
     score_team_1 = [(int)(element.text) for element in score_data.find_all(href = re.compile("^#0_a"))]
-    score_team_2 = [(int)(element.text) for element in score_data.find_all(href = re.compile("^#0_b"))]
+    score_team_2 = [(int)(element.text) if element.text.isdigit() else int(element.text.replace('x', '')) for element in score_data.find_all(href = re.compile("^#0_b"))]
     sum_team_1 = sum(score_team_1)
     sum_team_2 = sum(score_team_2)
     status = str(score_data.find(class_ = "state-icon"))

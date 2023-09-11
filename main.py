@@ -10,6 +10,8 @@ from okayu import *
 from sec import *
 from sinulist import *
 from baseball import gen_score_json
+from uno import *
+from uno_json import *
 
 app = Flask(__name__)
 
@@ -19,9 +21,10 @@ memo = ""
 sinulist = []
 kaitalist = {}
 okayu = {}
+game = None
 
 def loadfiles():
-    global sinulist, kaitalist, okayu, memo
+    global sinulist, kaitalist, okayu, memo, game
     if os.path.exists('list.pkl'):
         with open('list.pkl','rb') as f:
             sinulist = pickle.load(f)
@@ -34,6 +37,9 @@ def loadfiles():
     if os.path.exists('memo.pkl'):
         with open('memo.pkl','rb') as f:
             memo = pickle.load(f)
+    if os.path.exists('uno.pkl'):
+        with open('uno.pkl','rb') as f:
+            game = pickle.load(f)
 
 def set_memo(text):
     global memo
@@ -124,6 +130,7 @@ def handle_message(event):
     message_send = False
     global pic_save_availavle
     global kaitamono
+    global game
     linelist = commandsplit(event.message.text)
     while len(linelist) != 0 and oneshot == False:
         line = linelist.pop(0)
@@ -311,10 +318,174 @@ def handle_message(event):
                         result += f'WINNER {token}\n'
                     else:
                         result += 'DRAW\n'
-        else:
-            isNotCommand = True
 
-    if isNotCommand == False and message_send == False:
+        elif command == "uno" or command == "ウノ":
+            oneshot = True
+            message_send = True
+            if game == None:
+                game = Uno_Game(event.source.group_id)
+            if game.status == None:
+                game = Uno_Game(event.source.group_id)
+                game.status = "JOINING"
+                make_pkl(game, "uno")
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    FlexSendMessage('UNO', gen_start_json()
+                    )
+                )
+            else:
+                game = Uno_Game(event.source.group_id)
+                game.status = "JOINING"
+                make_pkl(game, "uno")
+                line_bot_api.push_message(game.id, TextSendMessage("前回のゲームを終了しました！"))
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    FlexSendMessage('UNO', gen_start_json()
+                    )
+                )
+        elif command == "uno_join" and game.status == "JOINING":
+            oneshot = True
+            message_send = True
+            try:
+                line_bot_api.get_profile(event.source.user_id)
+                if event.source.user_id not in game.users_raw:
+                    game.users_raw.append(event.source.user_id)
+                    make_pkl(game, "uno")
+                    line_bot_api.reply_message(event.reply_token, TextSendMessage(f"{line_bot_api.get_profile(event.source.user_id).display_name}さんが参加しました！"))
+                else:
+                    line_bot_api.reply_message(event.reply_token, TextSendMessage(f"{line_bot_api.get_profile(event.source.user_id).display_name}さんは既に参加しています"))
+            except:
+                    line_bot_api.reply_message(event.reply_token, TextSendMessage("友達追加してください！"))
+        
+        elif command == "uno_check_participant" and game.status == "JOINING":
+            oneshot = True
+            message_send = True
+            print(game.users_raw)
+            line_bot_api.reply_message(event.reply_token, FlexSendMessage('UNO', uno_check_participant([line_bot_api.get_profile(user).display_name for user in game.users_raw])))
+        
+        elif command == "uno_start_game" and game.status == "JOINING":
+            oneshot = True
+            message_send = True
+            game.start()
+            game.status = "START"
+            make_pkl(game, "uno")
+            for user in game.users_raw:
+                print(user)
+                line_bot_api.push_message(user, FlexSendMessage("手札情報", gen_hand_json(game.search_user(user).hand, game)))
+            line_bot_api.reply_message(event.reply_token, FlexSendMessage('UNO', gen_deck_info_json(None, line_bot_api.get_profile(game.next_user).display_name, game, [])))
+        
+        elif command == "reset":
+            oneshot = True
+            message_send = True
+            game.status = None
+            make_pkl(game, "uno")
+        
+        elif re.match("uno_pop_[0-9]_[0-9]{1,2}", command) and (game.status == "START" or game.status == "color_change"):
+            oneshot = True
+            message_send = True
+            user_id = event.source.user_id
+            print(game.next_user)
+            if game.next_user == user_id:
+                color, num = [int(n) for n in re.findall(r"\d+", command)]
+                if game.can_pop(color, num):
+                    if game.search_user(user_id).serach_card(color, num) or game.status == "color_change":
+                        if game.status == "color_change":
+                            game.status = "START"
+                            card = Card(color, num)
+                            make_pkl(game, "uno")
+                        else:
+                            if color == ACTION:
+                                game.status = "color_change"
+                                game.search_user(user_id).pop_card(color, num)
+                                make_pkl(game, "uno")
+                                line_bot_api.reply_message(event.reply_token, FlexSendMessage("色選択", gen_choice_color_json(num)))
+                                break
+                            card = game.search_user(user_id).pop_card(color, num)
+                        if num == REVERSE: game.reverse *= -1
+                        elif num == SKIP: game.turn += 1 if game.reverse == 1 else -1
+                        elif num == DRAW2: game.debt += 2
+                        elif num == DRAW4: game.debt += 4
+                        game.trush.append(card)
+                        game.prev_trush.append(card)
+                        current = game.next_user
+                        if len(game.search_user(current).hand) == 0:
+                            game.rm_user(current)
+                            if len(game.users_raw) == 1:
+                                game.rm_user(game.users_raw[0])
+                                game.status == None
+                                make_pkl(game, "uno")
+                        next = game.next()
+                        line_bot_api.push_message(game.id, FlexSendMessage("場札情報", gen_deck_info_json(line_bot_api.get_profile(current).display_name, line_bot_api.get_profile(next).display_name, game, [f"残り枚数: {len(game.search_user(current).hand)}"])))
+                        game.prev_trush.clear()
+                        make_pkl(game, "uno")
+                        line_bot_api.push_message(next, FlexSendMessage("手札情報", gen_hand_json(game.search_user(next).hand, game)))
+                    else: line_bot_api.reply_message(event.reply_token, TextSendMessage("そのカードはもう所持していません！"))
+                else:
+                    line_bot_api.reply_message(event.reply_token, TextSendMessage("そのカードは捨てられません！"))
+            else: line_bot_api.reply_message(event.reply_token, TextSendMessage(f"今はあなたのターンではありません！"))
+        
+        elif re.match("uno_multiple_pop_[0-9]_[0-9]{1,2}", command) and (game.status == "START" or game.status == "pop_multiple"):
+            oneshot = True
+            message_send = True
+            user_id = event.source.user_id
+            print(game.next_user)
+            make_pkl(game, "uno")
+            if game.next_user == user_id:
+                color, num = [int(n) for n in re.findall(r"\d+", command)]
+                check = game.can_multiple_pop(color, num) if game.status == "pop_multiple" else game.can_pop(color, num)
+                if check and color != ACTION:
+                    if game.search_user(user_id).serach_card(color, num):
+                        card = game.search_user(user_id).pop_card(color, num)
+                        if num == REVERSE: game.reverse *= -1
+                        elif num == SKIP: game.turn += 1 if game.reverse == 1 else -1
+                        elif num == DRAW2: game.debt += 2
+                        elif num == DRAW4: game.debt += 4
+                        game.trush.append(card)
+                        game.prev_trush.append(card)
+                        current = game.next_user
+                        if len(game.search_user(current).hand) == 0:
+                            game.rm_user(current)
+                            if len(game.users_raw) == 1:
+                                game.rm_user(game.users_raw[0])
+                                game.status == None
+                                make_pkl(game, "uno")
+                                line_bot_api.push_message(game.id, FlexSendMessage("リザルト", gen_result_json([line_bot_api.get_profile(user).display_name for user in game.ranking])))
+                                break
+                        game.status = "pop_multiple"
+                        make_pkl(game, "uno")
+                        line_bot_api.push_message(current, FlexSendMessage("手札情報", gen_hand_json(game.search_user(current).hand, game, 1)))
+                    else: line_bot_api.reply_message(event.reply_token, TextSendMessage("そのカードはもう所持していません！"))
+                else:
+                    line_bot_api.reply_message(event.reply_token, TextSendMessage("そのカードは捨てられません！"))
+            else: line_bot_api.reply_message(event.reply_token, TextSendMessage(f"今はあなたのターンではありません！"))
+        
+        elif re.match("uno_draw_[0-9]{1,2}", command) and game.status == "START":
+            oneshot = True
+            message_send = True
+            draw_num, = [int(n) for n in re.findall(r"\d+", command)]
+            if draw_num != 1: game.debt = 0
+            for _ in range(draw_num):
+                game.search_user(event.source.user_id).draw_card(game.deck[0])
+                game.deck = np.delete(game.deck, 0)
+            line_bot_api.reply_message(event.reply_token, FlexSendMessage("手札情報", gen_hand_json(game.search_user(event.source.user_id).hand, game)))
+            current = game.next_user
+            next = game.next()
+            make_pkl(game, "uno")
+            line_bot_api.push_message(next, FlexSendMessage("手札情報", gen_hand_json(game.search_user(next).hand, game)))
+            line_bot_api.push_message(game.id, FlexSendMessage("場札情報", gen_deck_info_json(line_bot_api.get_profile(current).display_name, line_bot_api.get_profile(next).display_name, game, [f"{line_bot_api.get_profile(current).display_name}さんが{draw_num}枚ドローしました！", f"残り枚数: {len(game.search_user(current).hand)}"])))
+        
+        elif command == "uno_end_select" and game.status == "pop_multiple":
+            oneshot = True
+            message_send = True
+            current = game.next_user
+            next = game.next()
+            line_bot_api.push_message(game.id, FlexSendMessage("場札情報", gen_deck_info_json(line_bot_api.get_profile(current).display_name, line_bot_api.get_profile(next).display_name, game, [f"残り枚数: {len(game.search_user(current).hand)}"])))
+            game.prev_trush.clear()
+            game.status = "START"
+            make_pkl(game, "uno")
+            line_bot_api.push_message(next, FlexSendMessage("手札情報", gen_hand_json(game.search_user(next).hand, game)))
+
+    if isNotCommand == True and message_send == False:
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(result.strip()))

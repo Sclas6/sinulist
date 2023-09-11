@@ -1,8 +1,8 @@
 test/
-.venv/
+env/
 img/
 __pycache__/
+.vscode/
 settings.py
 sec.py
 *.pkl
-test.py
