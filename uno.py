@@ -71,6 +71,7 @@ class Uno_Game():
 
     def can_pop(self, color: int, num: int) -> bool:
         top: Card = self.trush[-1]
+        #print(f"trush: {top} your: {COLORS[color]} {NUMBERS[num]}")
         if self.debt != 0:
             if top.number == DRAW2:
                 if top.number == num: return True

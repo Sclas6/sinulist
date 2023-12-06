@@ -193,7 +193,7 @@ def gen_hand_json(hand: list, game, mode = 0):
                 "action": {
                     "type": "message",
                     "label": "選択終了",
-                    "text": "uno_end_select"
+                    "text": f"{game.id}_uno_end_select"
                 }
             }
         )
@@ -202,6 +202,7 @@ def gen_hand_json(hand: list, game, mode = 0):
             can_pop = game.can_pop(card.color, card.number)
         else:
             can_pop = game.can_multiple_pop(card.color, card.number)
+        if len(hand) == 1 and card.number >= 10: can_pop = False
         if i % 2 == 1:
             contents["contents"].append(
                 {
@@ -251,7 +252,7 @@ def gen_hand_json(hand: list, game, mode = 0):
                         "action": {
                             "type": "message",
                             "label": "選択",
-                            "text": f"uno_pop_{card.color}_{card.number}" if mode == 0 else f"uno_multiple_pop_{card.color}_{card.number}"
+                            "text": f"{game.id}_uno_pop_{card.color}_{card.number}" if mode == 0 else f"{game.id}_uno_multiple_pop_{card.color}_{card.number}"
                         },
                         "style": "primary"
                     }
@@ -270,7 +271,7 @@ def gen_hand_json(hand: list, game, mode = 0):
                             "action": {
                                 "type": "message",
                                         "label": "複数選択",
-                                        "text": f"uno_multiple_pop_{card.color}_{card.number}"
+                                        "text": f"{game.id}_uno_multiple_pop_{card.color}_{card.number}"
                             },
                             "style": "primary"
                         }
@@ -312,7 +313,7 @@ def gen_hand_json(hand: list, game, mode = 0):
                         "action": {
                             "type": "message",
                             "label": "選択",
-                            "text": f"uno_pop_{card.color}_{card.number}" if mode == 0 else f"uno_multiple_pop_{card.color}_{card.number}"
+                            "text": f"{game.id}_uno_pop_{card.color}_{card.number}" if mode == 0 else f"{game.id}_uno_multiple_pop_{card.color}_{card.number}"
                         },
                         "style": "primary"
                     }
@@ -331,7 +332,7 @@ def gen_hand_json(hand: list, game, mode = 0):
                             "action": {
                                 "type": "message",
                                         "label": "複数選択",
-                                        "text": f"uno_multiple_pop_{card.color}_{card.number}"
+                                        "text": f"{game.id}_uno_multiple_pop_{card.color}_{card.number}"
                             },
                             "style": "primary"
                         }
@@ -376,7 +377,7 @@ def gen_hand_json(hand: list, game, mode = 0):
                             "action": {
                                 "type": "message",
                                 "label": "カードを引く" if game.debt == 0 else f"カードを引く ({game.debt}枚)",
-                                "text": "uno_draw_1" if game.debt == 0 else f"uno_draw_{game.debt}"
+                                "text": f"{game.id}_uno_draw_1" if game.debt == 0 else f"{game.id}_uno_draw_{game.debt}"
                             },
                             "style": "secondary"
                         }
@@ -444,7 +445,7 @@ def gen_deck_info_json(current, next, game: Uno_Game, message: list):
     )
     return contents
 
-def gen_choice_color_json(num: int):
+def gen_choice_color_json(num: int, game):
     contents = {
     "type": "bubble",
     "body": {
@@ -471,7 +472,7 @@ def gen_choice_color_json(num: int):
                         "action": {
                             "type": "message",
                             "label": "黄色",
-                            "text": f"uno_pop_0_{num}"
+                            "text": f"{game.id}_uno_pop_0_{num}"
                         },
                         "style": "primary"
                     },
@@ -485,7 +486,7 @@ def gen_choice_color_json(num: int):
                         "action": {
                             "type": "message",
                             "label": "青色",
-                            "text": f"uno_pop_1_{num}"
+                            "text": f"{game.id}_uno_pop_1_{num}"
                         },
                         "style": "primary"
                     }
@@ -505,7 +506,7 @@ def gen_choice_color_json(num: int):
                         "action": {
                             "type": "message",
                             "label": "赤色",
-                            "text": f"uno_pop_2_{num}"
+                            "text": f"{game.id}_uno_pop_2_{num}"
                         },
                         "style": "primary"
                     },
@@ -519,7 +520,7 @@ def gen_choice_color_json(num: int):
                         "action": {
                             "type": "message",
                             "label": "緑色",
-                            "text": f"uno_pop_3_{num}"
+                            "text": f"{game.id}_uno_pop_3_{num}"
                         },
                         "style": "primary"
                     }

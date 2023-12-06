@@ -1,27 +1,21 @@
 import dropbox
 from file_mng import *
-import json
 from sec import *
+from math import ceil
 
 def gen_json(contents, title):
-    content_num = 0
-    contains = 10
-    content = '{"type":"carousel","contents":['
+    contain = 10
+    content = {
+    "type": "carousel",
+    "contents": []}
     content_size = len(contents)
-    pages = int(content_size / contains) + 1
-    for i in range(1, pages if contains == 1 else pages + 1):
-        content += '{"type":"bubble","header":{"type":"box","layout":"vertical","contents":[{"type":"text","text":"'
-        content += f"{title} {i}/{pages}"
-        content += '","size": "xxl"}]},"body":{"type":"box","layout":"vertical","spacing": "sm","contents":[{"type":"text","wrap":true,"weight":"regular","size":"md","text":"'
-        for j in range(contains):
-            content += rf"・ {contents[content_num]}\n"
-            content_num += 1
-            if content_num >= content_size:
-                break
-        content += '","maxLines": 20}]}},'
-    content = content[:-1]
-    content += ']}'
-    return json.loads(content)
+    pages = ceil(content_size / contain)
+    for i in range(1, pages + 1):
+        element = ''.join([f"・{s}\n" for s in contents[(i-1) * 10 : (i*10)]])
+        content["contents"].append(
+        {"type":"bubble","header":{"type":"box","layout":"vertical","contents":[{"type":"text","text":f"{title} {i}/{pages}"
+        ,"size": "xxl"}]},"body":{"type":"box","layout":"vertical","spacing": "sm","contents":[{"type":"text","wrap":True,"weight":"regular","size":"md","text":element}]}})
+    return content
 
 def checkls(list, kakumono):
     juuhuku=False
