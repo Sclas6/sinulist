@@ -12,6 +12,7 @@ from sinulist import *
 from baseball import gen_score_json
 from uno import *
 from uno_json import *
+from yugioh import get_card_img
 
 app = Flask(__name__)
 
@@ -325,6 +326,18 @@ def handle_message(event):
                             result += f'WINNER {token}\n'
                         else:
                             result += 'DRAW\n'
+
+            elif command == "ドロー":
+                message_send = True
+                oneshot = True
+                url = get_card_img()
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    ImageSendMessage(
+                        preview_image_url=url,
+                        original_content_url=url
+                    )
+                )
 
             elif command == "uno" or command == "ウノ":
                 oneshot = True
