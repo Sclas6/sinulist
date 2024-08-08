@@ -8,3 +8,4 @@ __pycache__/
 settings.py
 sec.py
 *.pkl
+kaita_urls
