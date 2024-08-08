@@ -4,6 +4,7 @@ from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, ImageMessage, TextSendMessage, JoinEvent, FlexSendMessage, ImageSendMessage
 import os
 import re
+import random
 
 from file_mng import *
 from okayu import *
@@ -12,31 +13,15 @@ from sinulist import *
 from baseball import gen_score_json
 from uno import *
 from uno_json import *
-from yugioh import get_card_img
+from yugioh import get_card_img, get_card_img_2
 
 app = Flask(__name__)
 
-pic_save_availavle = False
-kaitamono = ""
-memo = ""
-sinulist = []
-kaitalist = {}
-okayu = {}
-
-def loadfiles():
-    global sinulist, kaitalist, okayu, memo
-    if os.path.exists('list.pkl'):
-        with open('list.pkl','rb') as f:
-            sinulist = pickle.load(f)
-    if os.path.exists('kaita.pkl'):
-        with open('kaita.pkl','rb') as f:
-            kaitalist = pickle.load(f)
-    if os.path.exists('okayu.pkl'):
-        with open('okayu.pkl','rb') as f:
-            okayu = pickle.load(f)
-    if os.path.exists('memo.pkl'):
-        with open('memo.pkl','rb') as f:
-            memo = pickle.load(f)
+def load_room() -> Room:
+    if os.path.exists('RoomInfo.pkl'):
+        with open('RoomInfo.pkl','rb') as f:
+            room = pickle.load(f)
+    return room
 
 def load_uno(id):
     if os.path.exists(f'uno/{id}_uno.pkl'):
@@ -44,11 +29,6 @@ def load_uno(id):
             game = pickle.load(f)
             return game
     return None
-
-def set_memo(text):
-    global memo
-    memo = text
-    make_pkl(memo, "memo")
 
 def commandsplit(line):
     commandlist = line.splitlines()
@@ -89,6 +69,26 @@ def send_image(path):
         else: return "File not exists"
     else: return "Operation not allowed"
 
+@app.route("/kawaii")
+def send_kawaii_html():
+    room = load_room()
+    return room.gen_onnna_json()
+    
+@app.route("/kakkoii")
+def send_kakkoii_html():
+    room = load_room()
+    return room.gen_kakkoii_json()
+
+@app.route("/tuyosou")
+def send_tuyosou_html():
+    room = load_room()
+    return room.gen_tuyosou_json()
+
+@app.route("/yowasou")
+def send_yowasou_html():
+    room = load_room()
+    return room.gen_yowasou_json()
+
 @app.route("/callback", methods=['POST'])
 def callback():
     # get X-Line-Signature header value
@@ -112,28 +112,26 @@ def join_event(event):
 
 @handler.add(MessageEvent, message=ImageMessage)
 def handle_image(event):
-    global pic_save_availavle
-    global kaitamono
+    room = load_room()
     text = ''
-    if pic_save_availavle == True:
+    if room.pic_save_availavle == True:
         message_id = event.message.id
         messege_content = line_bot_api.get_message_content(message_id)
-        pic_save(kaitalist, kaitamono, messege_content)
-        pic_save_availavle = False
-        text = f'{kaitamono}を保存しました!'
+        pic_save(room.kaitalist, room.kaitamono, messege_content)
+        room.pic_save_availavle = False
+        text = f'{room.kaitamono}を保存しました!'
         line_bot_api.push_message(event.source.group_id, TextSendMessage(text=text))
-        rmlist(sinulist, kaitamono)
-        text = '死ぬまでには描くものリストから{0}を削除しました!'.format(kaitamono)
+        rmlist(room.sinulist, room.kaitamono)
+        text = '死ぬまでには描くものリストから{0}を削除しました!'.format(room.kaitamono)
         line_bot_api.push_message(event.source.group_id, TextSendMessage(text=text))
+        room.save2pkl()
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    loadfiles()
+    room = load_room()
     result = ''
     oneshot = False
     message_send = False
-    global pic_save_availavle
-    global kaitamono
     linelist = commandsplit(event.message.text)
     try:
         game = load_uno(event.source.group_id)
@@ -155,7 +153,7 @@ def handle_message(event):
                     event.reply_token,
                     FlexSendMessage(
                         alt_text='描くものリスト',
-                        contents=gen_json(sinulist, "描くもの")
+                        contents=gen_json(list(room.sinulist.keys()), "描くもの")
                     )
                 )
             elif (command == 'ドラゴンズ' or command == '中日'):
@@ -166,6 +164,116 @@ def handle_message(event):
                     FlexSendMessage(
                         alt_text='中日速報',
                         contents=gen_score_json("dragons")
+                    )
+                )
+            elif (command == 'タイガース' or command == '阪神'):
+                oneshot = True
+                message_send = True
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    FlexSendMessage(
+                        alt_text='阪神速報',
+                        contents=gen_score_json("tigers")
+                    )
+                )
+            elif (command == 'カープ' or command == '広島'):
+                oneshot = True
+                message_send = True
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    FlexSendMessage(
+                        alt_text='広島速報',
+                        contents=gen_score_json("carp")
+                    )
+                )
+            elif (command == 'ベイスターズ' or command == 'DeNA'):
+                oneshot = True
+                message_send = True
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    FlexSendMessage(
+                        alt_text='横浜速報',
+                        contents=gen_score_json("baystars")
+                    )
+                )
+            elif (command == 'ジャイアンツ' or command == '巨人'):
+                oneshot = True
+                message_send = True
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    FlexSendMessage(
+                        alt_text='巨人速報',
+                        contents=gen_score_json("giants")
+                    )
+                )
+            elif (command == 'ヤクルト'):
+                oneshot = True
+                message_send = True
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    FlexSendMessage(
+                        alt_text='ヤクルト速報',
+                        contents=gen_score_json("swallows")
+                    )
+                )
+            elif (command == 'ソフトバンク'):
+                oneshot = True
+                message_send = True
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    FlexSendMessage(
+                        alt_text='ソフトバンク速報',
+                        contents=gen_score_json("hawks")
+                    )
+                )
+            elif (command == 'バッファローズ' or command == 'オリックス'):
+                oneshot = True
+                message_send = True
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    FlexSendMessage(
+                        alt_text='オリックス速報',
+                        contents=gen_score_json("buffaloes")
+                    )
+                )
+            elif (command == 'ロッテ' or command == '千葉'):
+                oneshot = True
+                message_send = True
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    FlexSendMessage(
+                        alt_text='ロッテ速報',
+                        contents=gen_score_json("marines")
+                    )
+                )
+            elif (command == 'イーグルス' or command == '楽天'):
+                oneshot = True
+                message_send = True
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    FlexSendMessage(
+                        alt_text='楽天速報',
+                        contents=gen_score_json("eagles")
+                    )
+                )
+            elif (command == 'ライオンズ' or command == '西武'):
+                oneshot = True
+                message_send = True
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    FlexSendMessage(
+                        alt_text='西武速報',
+                        contents=gen_score_json("lions")
+                    )
+                )
+            elif (command == '日ハム' or command == 'ハム'):
+                oneshot = True
+                message_send = True
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    FlexSendMessage(
+                        alt_text='日ハム速報',
+                        contents=gen_score_json("fighters")
                     )
                 )
             elif (command == 'エンゼルス' or command == 'エンジェルス'):
@@ -190,36 +298,34 @@ def handle_message(event):
                 )
             elif command == 'メモ':
                 if hastoken == True:
-                    set_memo(token)
+                    room.memo = token
                     result += "メモに保存しました!\n"
                 else:
-                    result += memo
-
+                    result += room.memo
+            elif command == "when" and hastoken == True:
+                if checkls(room.sinulist, token) == True:
+                    result += f"{token}の追加日時は{room.sinulist[token].strftime('%Y年%m月%d日 %H時%M分')}です!"
+                else: result += '{0}は存在しません!\n'.format(token)
             elif command == 'add' and hastoken == True:
                 kakumono = token
-                if checkls(sinulist, kakumono) == True:
+                if checkls(room.sinulist, kakumono) == True:
                     result += '{0}は既に存在しています!\n'.format(kakumono)
                 else:
                     result += '死ぬまでには描くものリストに{0}を追加しました!\n'.format(kakumono)
                     status = '@hyorohyoro66 {0}'.format(token)
-                    addlist(sinulist, kakumono)
+                    addlist(room.sinulist, kakumono)
             elif command == 'remove' or command == 'delete' or command == 'rm' or command == "削除":
                 if hastoken == True:
                     try:
-                        if token.isdecimal() == True:
-                            tokennum = int(token)
-                            kesumono = rmnum(sinulist, tokennum)
-                            str = '死ぬまでには描くものリストから{0}を削除しました!\n'.format(kesumono)
-                        else:
-                            kesumono = token
-                            str = '死ぬまでには描くものリストから{0}を削除しました!\n'.format(kesumono)
-                            rmlist(sinulist, kesumono)
+                        kesumono = token
+                        str = '死ぬまでには描くものリストから{0}を削除しました!\n'.format(kesumono)
+                        rmlist(room.sinulist, kesumono)
                     except ValueError:
                         str = '{0}は存在しません!\n'.format(kesumono)
                     result += str
                 else:
                     oneshot = True
-                    kesumono = rmrecent(sinulist)
+                    kesumono = rmrecent(room.sinulist)
                     str = '死ぬまでには描くものリストから{0}を削除しました!\n'.format(kesumono)
                     result += str
         #Picture Command
@@ -236,26 +342,25 @@ def handle_message(event):
                     event.reply_token,
                     FlexSendMessage(
                         alt_text='描くものリスト',
-                        contents=gen_json(list(kaitalist.keys()), "描いたもの")
+                        contents=gen_json(list(room.kaitalist.keys()), "描いたもの")
                     )
                 )
             elif (command == 'save' or command == 'comp' or command == 'complete' or command == '保存') and hastoken==True:
                 #oneshot=True
-                loadfiles()
-                if checkls(sinulist, token) == False:
+                if checkls(room.sinulist, token) == False:
                     result+='{0}は死ぬまでに描くものリストに存在しません!\n'.format(token)
                 else:
-                    if pic_checkls(kaitalist, token) == True:
+                    if pic_checkls(room.kaitalist, token) == True:
                         result+='{0}は既に存在しています!\n'.format(token)
                     else:
-                        pic_save_availavle = True
-                        kaitamono = token
+                        room.pic_save_availavle = True
+                        room.kaitamono = token
                         result += '{0}を保存します!\n画像を送信して下さい\n'.format(token)
             elif (command == 'pic' or command == 'showpic' or command == "見せて") and hastoken == True:
                 oneshot = True
                 haserror = False
                 try:
-                    url = kaitalist[token]
+                    url = room.kaitalist[token]
                 except KeyError:
                     result += '{0}は存在しません!\n'.format(token)
                     haserror = True
@@ -269,36 +374,20 @@ def handle_message(event):
                         )
                     )
             elif (command == 'prm' or command == 'pdelete' or command == '画像削除' or command == 'picrm')and hastoken == True:
-                if pic_checkls(kaitalist, token) == True:
-                    pic_rmlist(kaitalist, token)
+                if pic_checkls(room.kaitalist, token) == True:
+                    pic_rmlist(room.kaitalist, token)
                     result += '{0}の画像を削除しました!\n'.format(token)
                 else:
                     result += '{0}は存在しません!\n'.format(token)
             elif command == 'okayurm':
                     #debug_pic1224()
-                    result += f"removed {okayu_del(okayu, token)}"
-
-            elif command == "debug":
-                result += "debug"
+                    result += f"removed {okayu_del(room.okayu, token)}"
 
             elif command == '名取さなしりとり':
                 message_send = True
                 line_bot_api.reply_message(
                     event.reply_token,
                     TextSendMessage(text = '名取さな'))
-
-            elif command == 'test':
-                message_send = True
-                line_bot_api.reply_message(
-                    event.reply_token,
-                    TextSendMessage(text=event.source.group_id))
-
-            elif command == "0/0":
-                0 / 0
-                message_send = True
-                line_bot_api.reply_message(
-                    event.reply_token,
-                    TextSendMessage(text=event.source.group_id))
 
             elif( command == "okayu" or command == "おかゆ") and (hastoken == False):
                 result += "https://shindanmaker.com/957861"
@@ -308,29 +397,71 @@ def handle_message(event):
                 message_send = True
                 oneshot = True
                 profile = line_bot_api.get_profile(event.source.user_id)
-                okayu_up(okayu, profile.display_name, re.sub(r"\D", "", command))
+                okayu_up(room.okayu, profile.display_name, re.sub(r"\D", "", command))
 
             elif (command == "battle" and hastoken==True):
                 oneshot = True
                 profile = line_bot_api.get_profile(event.source.user_id)
                 if token == 'everyone':
-                    result += okayu_showall(okayu, profile.display_name)
+                    result += okayu_showall(room.okayu, profile.display_name)
                 else:
                     if okayu_check(token) == False:
                         result += f'{token}は1d100草粥をプレイしていません!\n'
                     else:
-                        result += f'{profile.display_name}({okayu_num(okayu, profile.display_name)}草粥) VS {token}({okayu, okayu_num(token)}草粥)\n'
-                        if(okayu_num(okayu, profile.display_name)>okayu_num(token)):
+                        result += f'{profile.display_name}({okayu_num(room.okayu, profile.display_name)}草粥) VS {token}({room.okayu, okayu_num(token)}草粥)\n'
+                        if(okayu_num(room.okayu, profile.display_name)>okayu_num(token)):
                             result += f'WINNER {profile.display_name}\n'
-                        elif(okayu_num(okayu, profile.display_name)<okayu_num(token)):
+                        elif(okayu_num(room.okayu, profile.display_name)<okayu_num(token)):
                             result += f'WINNER {token}\n'
                         else:
                             result += 'DRAW\n'
 
+            elif command == "debug":
+                message_send = True
+                oneshot = True
+                profile = line_bot_api.get_profile(event.source.user_id)
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text = room.drow_history.to_string()))
+
             elif command == "ドロー":
                 message_send = True
                 oneshot = True
-                url = get_card_img()
+                profile = line_bot_api.get_profile(event.source.user_id)
+                card_url, _ = room.drow(profile.display_name)
+                room.save2pkl()
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    ImageSendMessage(
+                        preview_image_url=card_url,
+                        original_content_url=card_url
+                    )
+                )
+            elif command == "ドロー虫":
+                message_send = True
+                oneshot = True
+                profile = line_bot_api.get_profile(event.source.user_id)
+                card_url, _ = room.drow(profile.display_name, "437734")
+                room.save2pkl()
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    ImageSendMessage(
+                        preview_image_url=card_url,
+                        original_content_url=card_url
+                    )
+                )
+            elif command == "ドロー数":
+                message_send = True
+                oneshot = True
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    FlexSendMessage('ドロー数', room.gen_graph_json()
+                    )
+                )
+                
+            elif command == "ドロー可愛い女":
+                message_send = True
+                url = random.sample(room.kawaii, 1)[0][0]
                 line_bot_api.reply_message(
                     event.reply_token,
                     ImageSendMessage(
@@ -338,6 +469,170 @@ def handle_message(event):
                         original_content_url=url
                     )
                 )
+            elif command == "かわいい":
+                message_send = True
+                oneshot = True
+                room.kawaii.add(room.last_drowed)
+                room.save2pkl()
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text = f"{room.last_drowed[1]}を可愛い女デッキに追加しました！"))
+                
+            elif command == 'かわいくない':
+                message_send = True
+                if hastoken == True:
+                    rm = room.rm_kawaikunai(token)
+                else:
+                    line_bot_api.reply_message(
+                        event.reply_token,
+                        TextSendMessage(text = "削除するカードを指定してください！"))
+                    continue
+                if rm != None:
+                    result = f"{rm}を可愛い女デッキから削除しました！"
+                else:
+                    result = f"{token}は可愛い女デッキに存在しません！"
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text = result))
+
+            elif command == "可愛い女デッキ":
+                oneshot = True
+                message_send = True
+                room.gen_onnna_json()
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text = "https://sclas.xyz/kawaii"))
+                
+            elif command == "ドローかっこいいデッキ":
+                message_send = True
+                url = random.sample(room.kakkoii, 1)[0][0]
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    ImageSendMessage(
+                        preview_image_url=url,
+                        original_content_url=url
+                    )
+                )
+            elif command == "かっこいい":
+                message_send = True
+                oneshot = True
+                room.kakkoii.add(room.last_drowed)
+                room.save2pkl()
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text = f"{room.last_drowed[1]}をかっこいいデッキに追加しました！"))
+                
+            elif command == 'かっこよくない':
+                message_send = True
+                if hastoken == True:
+                    rm = room.rm_kakkoyokunai(token)
+                else:
+                    line_bot_api.reply_message(
+                        event.reply_token,
+                        TextSendMessage(text = "削除するカードを指定してください！"))
+                    continue
+                if rm != None:
+                    result = f"{rm}をかっこいいデッキから削除しました！"
+                else:
+                    result = f"{token}はかっこいいデッキに存在しません！"
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text = result))
+
+            elif command == "かっこいいデッキ":
+                oneshot = True
+                message_send = True
+                room.gen_kakkoii_json()
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text = "https://sclas.xyz/kakkoii"))
+
+            elif command == "ドローつよそう":
+                message_send = True
+                url = random.sample(room.tuyosou, 1)[0][0]
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    ImageSendMessage(
+                        preview_image_url=url,
+                        original_content_url=url
+                    )
+                )
+
+            elif command == "つよそう":
+                message_send = True
+                oneshot = True
+                room.tuyosou.add(room.last_drowed)
+                room.save2pkl()
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text = f"{room.last_drowed[1]}をつよそうデッキに追加しました！"))
+                
+            elif command == 'つよくなさそう':
+                message_send = True
+                if hastoken == True:
+                    rm = room.rm_tuyosou(token)
+                else:
+                    line_bot_api.reply_message(
+                        event.reply_token,
+                        TextSendMessage(text = "削除するカードを指定してください！"))
+                    continue
+                if rm != None:
+                    result = f"{rm}をつよそうデッキから削除しました！"
+                else:
+                    result = f"{token}はつよそうデッキに存在しません！"
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text = result))
+
+            elif command == "つよそうデッキ":
+                oneshot = True
+                message_send = True
+                room.gen_tuyosou_json()
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text = "https://sclas.xyz/tuyosou"))
+
+            elif command == "ドローよわそう":
+                message_send = True
+                url = random.sample(room.yowasou, 1)[0][0]
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    ImageSendMessage(
+                        preview_image_url=url,
+                        original_content_url=url
+                    )
+                )
+
+            elif command == "よわそう":
+                message_send = True
+                oneshot = True
+                room.yowasou.add(room.last_drowed)
+                room.save2pkl()
+
+            elif command == 'よわくなさそう':
+                message_send = True
+                if hastoken == True:
+                    rm = room.rm_yowasou(token)
+                else:
+                    line_bot_api.reply_message(
+                        event.reply_token,
+                        TextSendMessage(text = "削除するカードを指定してください！"))
+                    continue
+                if rm != None:
+                    result = f"{rm}をよわそうデッキから削除しました！"
+                else:
+                    result = f"{token}はよわそうデッキに存在しません！"
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text = result))
+
+            elif command == "よわそうデッキ":
+                oneshot = True
+                message_send = True
+                room.gen_yowasou_json()
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text = "https://sclas.xyz/yowasou"))
 
             elif command == "uno" or command == "ウノ":
                 oneshot = True
@@ -514,6 +809,12 @@ def handle_message(event):
                 game.status = "START"
                 make_pkl(game, f"uno/{game.id}_uno")
                 line_bot_api.push_message(next, FlexSendMessage("手札情報", gen_hand_json(game.search_user(next).hand, game)))
+            elif re.match("https://twitter.com/.*", command):
+                oneshot = True
+                message_send = True
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text = command.replace('twitter', 'x')))
             else:
                 message_send = True
         
@@ -522,6 +823,7 @@ def handle_message(event):
             line_bot_api.reply_message(
                 event.reply_token,
                 TextSendMessage(text=result.strip()))
+        room.save2pkl()
     except Exception as e:
         line_bot_api.reply_message(
                 event.reply_token,

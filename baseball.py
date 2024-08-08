@@ -10,13 +10,11 @@ import requests
 import time
 
 def gen_score_json(team):
-    if team == "dragons":
-        data = gen_dragons_info()
-    elif team == "mlb_angels":
+    if team == "mlb_angels":
         data = gen_mlb_info("angels")
     elif team == "mlb_dodgers":
         data = gen_mlb_info("dodgers")
-    else : data = gen_dragons_info()
+    else : data = gen_npb_info(team)
     content = '{"type": "bubble","hero": {"type":"box","layout":"vertical","contents":[{"type": "image","url": '
     content += f'"{data["url"]}"'
     content +=  ',"size": "full","aspectRatio": "5:1","aspectMode": "cover"}],"height":"68px","backgroundColor": '
@@ -31,6 +29,72 @@ def gen_score_json(team):
     content += f'"{data["now"]}"'
     content += ',"wrap": true,"color": "#666666","size": "sm","flex": 5}]}]}]}}'
     return json.loads(content)
+
+def gen_npb_info(team: str):
+    week = ["月", "火", "水", "木", "金", "土", "日"]
+    load_url = f"https://www.nikkansports.com/baseball/professional/team/{team}/"
+    html = requests.get(load_url)
+    soup = bs(html.content, "html.parser")
+    score_raw = soup.find(class_ = "scoreTable")
+    teams = list()
+    score_team_1 = list()
+    score_team_2 = list()
+    table = score_raw.find_all("tr")
+    for i, row in enumerate(table):
+        if i == 0: continue
+        teams.append(row.find(class_="team").text.replace("\xa0", ""))
+        for j, point in enumerate(row.find_all("td")):
+            if j == 0: continue
+            if i == 1:
+                if point.text != "\xa0":
+                    score_team_1.append((int)(point.text))
+                else:
+                    score_team_1.append("")
+            else:
+                if point.text != "\xa0":
+                    score_team_2.append((int)(point.text) if point.text.isdigit() else "X")
+                else:
+                    score_team_2.append("")
+    status = soup.find("h5").text
+    status = re.search(r"【(.+)】", status).group(1)
+    now = status
+    date = soup.find(id="upDate").text.replace("更新", "")
+    date = datetime.datetime.strptime(date, "%Y年%m月%d日%H時%M分%S秒")
+    date = date.strftime(f"%Y年%m月%d日({week[date.weekday()]})")
+
+    team_color = {"giants":"#FF7820", "tigers":"#FFE100", "carp":"#E50012",
+                  "dragons":"#003595", "baystars":"#0052CD", "swallows":"#073170",
+                  "hawks":"#FBC700", "buffaloes":"#A47B01", "marines":"#CCCCCC",
+                  "eagles":"#870010", "lions":"#00215B", "fighters":"#01609A"}
+
+    color_back = team_color[team]
+    color_text = "#999999"
+
+    df = pd.DataFrame({teams[0]: score_team_1, teams[1]: score_team_2}, index=[i + 1 if i != len(score_team_1) - 1 else "計" for i in range(len(score_team_1))]).T
+    fig, ax = plt.subplots(figsize=(5,1))
+    fig.patch.set_facecolor(color_back)
+
+    ax.axis("off")
+    tb = ax.table(
+        cellText=df.values, colLabels=df.columns, rowLabels=teams,
+        loc = "center", cellLoc='center'
+        )
+    tb.scale(1, 1.4)
+    for cell in tb.properties()['children']:
+        cell.get_text().set_color('white')
+        cell.set_edgecolor("white")
+        cell.set_facecolor(color_back)
+
+    for i in range(len(score_team_1)):
+        tb[0, i].set_color(color_back)
+        tb[0, i].set_text_props(color = color_text)
+    plt.subplots_adjust(wspace=0.4)
+    img_name = str(time.time()).replace('.','').ljust(17, '0')
+    plt.savefig(f"img/{img_name}", facecolor = fig.get_facecolor(), dpi = 500, bbox_inches='tight', pad_inches=0.25)
+    organize_files()
+
+    return {"url": f"https://sclas.xyz/img/{img_name}.png", "teams":(f"{teams[0]} VS {teams[1]}"), "data": date, "status": status, "now": now, "color": color_back}
+
 
 def gen_mlb_info(team):
     load_url = f"https://www.mlb.com/{team}/scores"

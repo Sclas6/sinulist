@@ -2,6 +2,7 @@ import dropbox
 from file_mng import *
 from sec import *
 from math import ceil
+import datetime
 
 def gen_json(contents, title):
     contain = 10
@@ -18,38 +19,20 @@ def gen_json(contents, title):
     return content
 
 def checkls(list, kakumono):
-    juuhuku=False
-    for n in range(len(list)):
-        if kakumono == list[n]:
-            juuhuku = True
-    if juuhuku == True:
-        return True
-    else:
-        return False
+    return kakumono in list
 
 def addlist(list, kakumono):
-    list.append(kakumono)
-    make_pkl(list, "list")
+    list[kakumono] = datetime.datetime.now()
 
 def rmlist(list, kakumono):
-    list.remove(kakumono)
-    make_pkl(list, "list")
+    list.pop(kakumono)
 
 def rmrecent(list):
-    str = list[-1]
-    rmlist(list, list[-1])
-    return str
-
-def rmnum(list, num):
-    str = list[num - 1]
-    rmlist(list[num - 1])
-    return str
+    elem, _ = list.popitem()
+    return elem
 
 def pic_checkls(list, content):
-    for n in list:
-        if content == n:
-            return True
-    return False
+    return content in list
 
 def pic_save(list, kaitamono, content):
     client = dropbox.Dropbox(ACCESS_TOKEN)
@@ -71,8 +54,6 @@ def pic_save(list, kaitamono, content):
             url = link.url
             url = url.replace('www.dropbox','dl.dropboxusercontent').replace('?dl=0','')
     list[kaitamono] = url
-    make_pkl(list, "kaita")
 
 def pic_rmlist(list, kesumono):
     list.pop(kesumono)
-    make_pkl(list, "kaita")

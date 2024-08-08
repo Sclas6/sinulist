@@ -1,6 +1,8 @@
 test/
 env/
 img/
+yugioh_url/
+templates
 __pycache__/
 .vscode/
 settings.py
