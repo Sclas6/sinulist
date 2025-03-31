@@ -9,12 +9,14 @@ import re
 import requests
 import time
 
-def gen_score_json(team):
+def gen_score_json(team, folder: str):
     if team == "mlb_angels":
-        data = gen_mlb_info("angels")
+        data = gen_mlb_info("angels", folder)
     elif team == "mlb_dodgers":
-        data = gen_mlb_info("dodgers")
-    else : data = gen_npb_info(team)
+        data = gen_mlb_info("dodgers", folder)
+    elif team == "mlb_whitesox":
+        data = gen_mlb_info("whitesox", folder)
+    else : data = gen_npb_info(team, folder)
     content = '{"type": "bubble","hero": {"type":"box","layout":"vertical","contents":[{"type": "image","url": '
     content += f'"{data["url"]}"'
     content +=  ',"size": "full","aspectRatio": "5:1","aspectMode": "cover"}],"height":"68px","backgroundColor": '
@@ -30,7 +32,7 @@ def gen_score_json(team):
     content += ',"wrap": true,"color": "#666666","size": "sm","flex": 5}]}]}]}}'
     return json.loads(content)
 
-def gen_npb_info(team: str):
+def gen_npb_info(team: str, folder):
     week = ["月", "火", "水", "木", "金", "土", "日"]
     load_url = f"https://www.nikkansports.com/baseball/professional/team/{team}/"
     html = requests.get(load_url)
@@ -90,13 +92,13 @@ def gen_npb_info(team: str):
         tb[0, i].set_text_props(color = color_text)
     plt.subplots_adjust(wspace=0.4)
     img_name = str(time.time()).replace('.','').ljust(17, '0')
-    plt.savefig(f"img/{img_name}", facecolor = fig.get_facecolor(), dpi = 500, bbox_inches='tight', pad_inches=0.25)
-    organize_files()
+    plt.savefig(f"{folder}img/{img_name}", facecolor = fig.get_facecolor(), dpi = 500, bbox_inches='tight', pad_inches=0.25)
+    organize_files(folder)
 
-    return {"url": f"https://sclas.xyz/img/{img_name}.png", "teams":(f"{teams[0]} VS {teams[1]}"), "data": date, "status": status, "now": now, "color": color_back}
+    return {"url": f"https://sclas.xyz:10710/img/{img_name}.png", "teams":(f"{teams[0]} VS {teams[1]}"), "data": date, "status": status, "now": now, "color": color_back}
 
 
-def gen_mlb_info(team):
+def gen_mlb_info(team, folder):
     load_url = f"https://www.mlb.com/{team}/scores"
     #load_url = "https://www.mlb.com/angels/scores/2023-07-26"
     html = requests.get(load_url)
@@ -135,6 +137,8 @@ def gen_mlb_info(team):
 
     if team == "dodgers":
         color_back = "#004680"
+    elif team == "whitesox":
+        color_back = "#27251F"
     else:
         color_back = "#862633"
     color_text = "#cccccc"
@@ -159,10 +163,10 @@ def gen_mlb_info(team):
         tb[0, i].set_text_props(color = color_text)
     plt.subplots_adjust(wspace=0.4)
     img_name = str(time.time()).replace('.', '').ljust(17, '0')
-    plt.savefig(f"img/{img_name}", facecolor = fig.get_facecolor(), dpi = 500, bbox_inches='tight', pad_inches=0.25)
-    organize_files()
+    plt.savefig(f"{folder}img/{img_name}", facecolor = fig.get_facecolor(), dpi = 500, bbox_inches='tight', pad_inches=0.25)
+    organize_files(folder)
 
-    return {"url":f"https://sclas.xyz/img/{img_name}.png", "teams":(f"{teams[0]} VS {teams[1]}"), "data": data, "status": status, "now": (("TOP " if now >= 0 else "BOT ") + f"{abs(now)} " + (teams[0] if now >= 0 else teams[1])), "color": color_back}
+    return {"url":f"https://sclas.xyz:10710/img/{img_name}.png", "teams":(f"{teams[0]} VS {teams[1]}"), "data": data, "status": status, "now": (("TOP " if now >= 0 else "BOT ") + f"{abs(now)} " + (teams[0] if now >= 0 else teams[1])), "color": color_back}
 
 def gen_dragons_info():
     load_url = "https://dragons.jp/game/scoreboard/"
@@ -221,6 +225,6 @@ def gen_dragons_info():
     plt.subplots_adjust(wspace=0.4)
     img_name = str(time.time()).replace('.','').ljust(17, '0')
     plt.savefig(f"img/{img_name}", facecolor = fig.get_facecolor(), dpi = 500, bbox_inches='tight', pad_inches=0.25)
-    organize_files()
+    organize_files(folder)
 
-    return {"url": f"https://sclas.xyz/img/{img_name}.png", "teams":(f"{teams[0]} VS {teams[1]}"), "data": data, "status": status, "now": (f"{abs(now)}回" + ("表 " if now >= 0 else "裏 ") + (teams[0] if now >= 0 else teams[1]) + "の攻撃"), "color": color_back}
+    return {"url": f"https://sclas.xyz:10710/img/{img_name}.png", "teams":(f"{teams[0]} VS {teams[1]}"), "data": data, "status": status, "now": (f"{abs(now)}回" + ("表 " if now >= 0 else "裏 ") + (teams[0] if now >= 0 else teams[1]) + "の攻撃"), "color": color_back}

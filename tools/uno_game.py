@@ -1,4 +1,6 @@
 import numpy as np
+import sys
+sys.path.append('/root/py/kakumono/tools')
 from uno_constant import *
 
 class Card():

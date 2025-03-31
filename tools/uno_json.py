@@ -1,6 +1,7 @@
+import sys
+sys.path.append('/root/py/kakumono/tools')
 from uno_constant import *
-from uno import *
-
+from uno_game import *
 
 def gen_start_json():
     contents = {

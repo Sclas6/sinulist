@@ -1,31 +1,33 @@
 from flask import *
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, ImageMessage, TextSendMessage, JoinEvent, FlexSendMessage, ImageSendMessage
+from linebot.models import MessageEvent, TextMessage, ImageMessage, StickerMessage, TextSendMessage, JoinEvent, FlexSendMessage, ImageSendMessage
 import os
 import re
 import random
 
+import sys
+sys.path.append('/root/py/kakumono/tools')
 from file_mng import *
 from okayu import *
 from sec import *
 from sinulist import *
 from baseball import gen_score_json
-from uno import *
+from uno_game import *
 from uno_json import *
 from yugioh import get_card_img, get_card_img_2
 
 app = Flask(__name__)
 
 def load_room() -> Room:
-    if os.path.exists('RoomInfo.pkl'):
-        with open('RoomInfo.pkl','rb') as f:
+    if os.path.exists('../pkl/RoomInfo.pkl'):
+        with open('../pkl/RoomInfo.pkl','rb') as f:
             room = pickle.load(f)
     return room
 
 def load_uno(id):
-    if os.path.exists(f'uno/{id}_uno.pkl'):
-        with open(f'uno/{id}_uno.pkl','rb') as f:
+    if os.path.exists(f'../pkl/uno/{id}_uno.pkl'):
+        with open(f'../pkl/uno/{id}_uno.pkl','rb') as f:
             game = pickle.load(f)
             return game
     return None
@@ -57,37 +59,6 @@ def well_known(filename):
 @app.route("/")
 def hello():
     return "Sinulist Server Status: ONLINE"
-
-@app.route("/img/<string:path>")
-def send_image(path):
-    dir = "img/"
-    path = os.path.relpath(f"{os.getcwd()}/{dir}{path}")
-    if os.path.commonprefix([dir, path]) == dir:
-        if os.path.isfile(path):
-            print("OK")
-            return send_file(path)
-        else: return "File not exists"
-    else: return "Operation not allowed"
-
-@app.route("/kawaii")
-def send_kawaii_html():
-    room = load_room()
-    return room.gen_onnna_json()
-    
-@app.route("/kakkoii")
-def send_kakkoii_html():
-    room = load_room()
-    return room.gen_kakkoii_json()
-
-@app.route("/tuyosou")
-def send_tuyosou_html():
-    room = load_room()
-    return room.gen_tuyosou_json()
-
-@app.route("/yowasou")
-def send_yowasou_html():
-    room = load_room()
-    return room.gen_yowasou_json()
 
 @app.route("/callback", methods=['POST'])
 def callback():
@@ -126,6 +97,21 @@ def handle_image(event):
         line_bot_api.push_message(event.source.group_id, TextSendMessage(text=text))
         room.save2pkl()
 
+@handler.add(MessageEvent, message=StickerMessage)
+def handle_sticker(event):
+    room = load_room()
+    sticker_id = event.message.sticker_id
+    if sticker_id == "9267865":
+        profile = line_bot_api.get_profile(event.source.user_id)
+        card_url, _ = room.drow(profile.display_name)
+        room.save2pkl()
+        line_bot_api.reply_message(event.reply_token,
+            ImageSendMessage(
+                preview_image_url=card_url,
+                original_content_url=card_url
+            )
+        )
+
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     room = load_room()
@@ -133,6 +119,7 @@ def handle_message(event):
     oneshot = False
     message_send = False
     linelist = commandsplit(event.message.text)
+
     try:
         game = load_uno(event.source.group_id)
     except: pass
@@ -163,7 +150,7 @@ def handle_message(event):
                     event.reply_token,
                     FlexSendMessage(
                         alt_text='中日速報',
-                        contents=gen_score_json("dragons")
+                        contents=gen_score_json("dragons", "../tools/")
                     )
                 )
             elif (command == 'タイガース' or command == '阪神'):
@@ -173,7 +160,7 @@ def handle_message(event):
                     event.reply_token,
                     FlexSendMessage(
                         alt_text='阪神速報',
-                        contents=gen_score_json("tigers")
+                        contents=gen_score_json("tigers", "../tools/")
                     )
                 )
             elif (command == 'カープ' or command == '広島'):
@@ -183,7 +170,7 @@ def handle_message(event):
                     event.reply_token,
                     FlexSendMessage(
                         alt_text='広島速報',
-                        contents=gen_score_json("carp")
+                        contents=gen_score_json("carp", "../tools/")
                     )
                 )
             elif (command == 'ベイスターズ' or command == 'DeNA'):
@@ -193,7 +180,7 @@ def handle_message(event):
                     event.reply_token,
                     FlexSendMessage(
                         alt_text='横浜速報',
-                        contents=gen_score_json("baystars")
+                        contents=gen_score_json("baystars", "../tools/")
                     )
                 )
             elif (command == 'ジャイアンツ' or command == '巨人'):
@@ -203,7 +190,7 @@ def handle_message(event):
                     event.reply_token,
                     FlexSendMessage(
                         alt_text='巨人速報',
-                        contents=gen_score_json("giants")
+                        contents=gen_score_json("giants", "../tools/")
                     )
                 )
             elif (command == 'ヤクルト'):
@@ -213,7 +200,7 @@ def handle_message(event):
                     event.reply_token,
                     FlexSendMessage(
                         alt_text='ヤクルト速報',
-                        contents=gen_score_json("swallows")
+                        contents=gen_score_json("swallows", "../tools/")
                     )
                 )
             elif (command == 'ソフトバンク'):
@@ -223,7 +210,7 @@ def handle_message(event):
                     event.reply_token,
                     FlexSendMessage(
                         alt_text='ソフトバンク速報',
-                        contents=gen_score_json("hawks")
+                        contents=gen_score_json("hawks", "../tools/")
                     )
                 )
             elif (command == 'バッファローズ' or command == 'オリックス'):
@@ -233,7 +220,7 @@ def handle_message(event):
                     event.reply_token,
                     FlexSendMessage(
                         alt_text='オリックス速報',
-                        contents=gen_score_json("buffaloes")
+                        contents=gen_score_json("buffaloes", "../tools/")
                     )
                 )
             elif (command == 'ロッテ' or command == '千葉'):
@@ -243,7 +230,7 @@ def handle_message(event):
                     event.reply_token,
                     FlexSendMessage(
                         alt_text='ロッテ速報',
-                        contents=gen_score_json("marines")
+                        contents=gen_score_json("marines", "../tools/")
                     )
                 )
             elif (command == 'イーグルス' or command == '楽天'):
@@ -253,7 +240,7 @@ def handle_message(event):
                     event.reply_token,
                     FlexSendMessage(
                         alt_text='楽天速報',
-                        contents=gen_score_json("eagles")
+                        contents=gen_score_json("eagles", "../tools/")
                     )
                 )
             elif (command == 'ライオンズ' or command == '西武'):
@@ -263,7 +250,7 @@ def handle_message(event):
                     event.reply_token,
                     FlexSendMessage(
                         alt_text='西武速報',
-                        contents=gen_score_json("lions")
+                        contents=gen_score_json("lions", "../tools/")
                     )
                 )
             elif (command == '日ハム' or command == 'ハム'):
@@ -273,7 +260,7 @@ def handle_message(event):
                     event.reply_token,
                     FlexSendMessage(
                         alt_text='日ハム速報',
-                        contents=gen_score_json("fighters")
+                        contents=gen_score_json("fighters", "../tools/")
                     )
                 )
             elif (command == 'エンゼルス' or command == 'エンジェルス'):
@@ -283,7 +270,7 @@ def handle_message(event):
                     event.reply_token,
                     FlexSendMessage(
                         alt_text='エンゼルス速報',
-                        contents=gen_score_json("mlb_angels")
+                        contents=gen_score_json("mlb_angels", "../tools/")
                     )
                 )
             elif (command == 'ドジャース' or command == 'ドジャーズ'):
@@ -293,7 +280,17 @@ def handle_message(event):
                     event.reply_token,
                     FlexSendMessage(
                         alt_text='ドジャース速報',
-                        contents=gen_score_json("mlb_dodgers")
+                        contents=gen_score_json("mlb_dodgers", "../tools/")
+                    )
+                )
+            elif (command == 'Wソックス' or command == 'ホワイトソックス'):
+                oneshot = True
+                message_send = True
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    FlexSendMessage(
+                        alt_text='Wソックス速報',
+                        contents=gen_score_json("mlb_whitesox", "../tools/")
                     )
                 )
             elif command == 'メモ':
@@ -455,7 +452,7 @@ def handle_message(event):
                 oneshot = True
                 line_bot_api.reply_message(
                     event.reply_token,
-                    FlexSendMessage('ドロー数', room.gen_graph_json()
+                    FlexSendMessage('ドロー数', room.gen_graph_json("../tools/")
                     )
                 )
                 
@@ -501,7 +498,7 @@ def handle_message(event):
                 room.gen_onnna_json()
                 line_bot_api.reply_message(
                     event.reply_token,
-                    TextSendMessage(text = "https://sclas.xyz/kawaii"))
+                    TextSendMessage(text = "https://sclas.xyz:10710/kawaii"))
                 
             elif command == "ドローかっこいいデッキ":
                 message_send = True
@@ -545,7 +542,7 @@ def handle_message(event):
                 room.gen_kakkoii_json()
                 line_bot_api.reply_message(
                     event.reply_token,
-                    TextSendMessage(text = "https://sclas.xyz/kakkoii"))
+                    TextSendMessage(text = "https://sclas.xyz:10710/kakkoii"))
 
             elif command == "ドローつよそう":
                 message_send = True
@@ -590,7 +587,7 @@ def handle_message(event):
                 room.gen_tuyosou_json()
                 line_bot_api.reply_message(
                     event.reply_token,
-                    TextSendMessage(text = "https://sclas.xyz/tuyosou"))
+                    TextSendMessage(text = "https://sclas.xyz:10710/tuyosou"))
 
             elif command == "ドローよわそう":
                 message_send = True
@@ -632,22 +629,22 @@ def handle_message(event):
                 room.gen_yowasou_json()
                 line_bot_api.reply_message(
                     event.reply_token,
-                    TextSendMessage(text = "https://sclas.xyz/yowasou"))
+                    TextSendMessage(text = "https://sclas.xyz:10710/yowasou"))
 
             elif command == "uno" or command == "ウノ":
                 oneshot = True
                 message_send = True
                 if game == None:
                     game = Uno_Game(event.source.group_id)
-                    make_pkl(game, f"uno/{game.id}_uno")
+                    make_pkl(game, f"../pkl/uno/{game.id}_uno")
                 if game.status == None:
                     game = Uno_Game(event.source.group_id)
                     game.status = "JOINING"
-                    make_pkl(game, f"uno/{game.id}_uno")
+                    make_pkl(game, f"../pkl/uno/{game.id}_uno")
                 else:
                     game = Uno_Game(event.source.group_id)
                     game.status = "JOINING"
-                    make_pkl(game, f"uno/{game.id}_uno")
+                    make_pkl(game, f"../pkl/uno/{game.id}_uno")
                     line_bot_api.push_message(game.id, TextSendMessage(text="前回のゲームを終了しました！"))
                 line_bot_api.reply_message(
                     event.reply_token,
@@ -661,7 +658,7 @@ def handle_message(event):
                     line_bot_api.get_profile(event.source.user_id)
                     if event.source.user_id not in game.users_raw:
                         game.users_raw.append(event.source.user_id)
-                        make_pkl(game, f"uno/{game.id}_uno")
+                        make_pkl(game, f"../pkl/uno/{game.id}_uno")
                         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"{line_bot_api.get_profile(event.source.user_id).display_name}さんが参加しました！"))
                     else:
                         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"{line_bot_api.get_profile(event.source.user_id).display_name}さんは既に参加しています"))
@@ -679,7 +676,7 @@ def handle_message(event):
                 message_send = True
                 game.start()
                 game.status = "START"
-                make_pkl(game, f"uno/{game.id}_uno")
+                make_pkl(game, f"../pkl/uno/{game.id}_uno")
                 for user in game.users_raw:
                     print(user)
                     line_bot_api.push_message(user, FlexSendMessage("手札情報", gen_hand_json(game.search_user(user).hand, game)))
@@ -689,7 +686,7 @@ def handle_message(event):
                 oneshot = True
                 message_send = True
                 game.status = None
-                make_pkl(game, f"uno/{game.id}_uno")
+                make_pkl(game, f"../pkl/uno/{game.id}_uno")
             
             elif re.match(".*_uno_pop_[0-9]_[0-9]{1,2}", command):
                 oneshot = True
@@ -703,12 +700,12 @@ def handle_message(event):
                             if game.status == "color_change":
                                 game.status = "START"
                                 card = Card(color, num)
-                                make_pkl(game, f"uno/{game.id}_uno")
+                                make_pkl(game, f"../pkl/uno/{game.id}_uno")
                             else:
                                 if color == ACTION:
                                     game.status = "color_change"
                                     game.search_user(user_id).pop_card(color, num)
-                                    make_pkl(game, f"uno/{game.id}_uno")
+                                    make_pkl(game, f"../pkl/uno/{game.id}_uno")
                                     line_bot_api.reply_message(event.reply_token, FlexSendMessage("色選択", gen_choice_color_json(num, game)))
                                     break
                                 card = game.search_user(user_id).pop_card(color, num)
@@ -724,14 +721,14 @@ def handle_message(event):
                                 if len(game.users_raw) == 1:
                                     game.rm_user(game.users_raw[0])
                                     game.status = None
-                                    make_pkl(game, f"uno/{game.id}_uno")
+                                    make_pkl(game, f"../pkl/uno/{game.id}_uno")
                                     line_bot_api.push_message(game.id, FlexSendMessage("場札情報", gen_deck_info_json(line_bot_api.get_profile(current).display_name, "line_bot_api.get_profile(next).display_name", game, [f"残り枚数: {len(game.search_user(current).hand)}"])))
                                     line_bot_api.push_message(game.id, FlexSendMessage("リザルト", gen_result_json([line_bot_api.get_profile(user).display_name for user in game.ranking])))
                                     break
                             next = game.next()
                             line_bot_api.push_message(game.id, FlexSendMessage("場札情報", gen_deck_info_json(line_bot_api.get_profile(current).display_name, line_bot_api.get_profile(next).display_name, game, [f"残り枚数: {len(game.search_user(current).hand)}"])))
                             game.prev_trush.clear()
-                            make_pkl(game, f"uno/{game.id}_uno")
+                            make_pkl(game, f"../pkl/uno/{game.id}_uno")
                             line_bot_api.push_message(next, FlexSendMessage("手札情報", gen_hand_json(game.search_user(next).hand, game)))
                         else: line_bot_api.reply_message(event.reply_token, TextSendMessage(text="そのカードはもう所持していません！"))
                     else:
@@ -744,7 +741,7 @@ def handle_message(event):
                 user_id = event.source.user_id
                 group_id, _, _, _, color, num = [int(n) if n.isdigit() else n for n in command.split('_')]
                 game = load_uno(group_id)
-                make_pkl(game, f"uno/{game.id}_uno")
+                make_pkl(game, f"../pkl/uno/{game.id}_uno")
                 if game.next_user == user_id  and (game.status == "START" or game.status == "pop_multiple"):
                     check = game.can_multiple_pop(color, num) if game.status == "pop_multiple" else game.can_pop(color, num)
                     if check and color != ACTION:
@@ -762,11 +759,11 @@ def handle_message(event):
                                 if len(game.users_raw) == 1:
                                     game.rm_user(game.users_raw[0])
                                     game.status = None
-                                    make_pkl(game, f"uno/{game.id}_uno")
+                                    make_pkl(game, f"../pkl/uno/{game.id}_uno")
                                     line_bot_api.push_message(game.id, FlexSendMessage("リザルト", gen_result_json([line_bot_api.get_profile(user).display_name for user in game.ranking])))
                                     break
                             game.status = "pop_multiple"
-                            make_pkl(game, f"uno/{game.id}_uno")
+                            make_pkl(game, f"uno/../pkl/{game.id}_uno")
                             line_bot_api.push_message(current, FlexSendMessage("手札情報", gen_hand_json(game.search_user(current).hand, game, 1)))
                         else: line_bot_api.reply_message(event.reply_token, TextSendMessage(text="そのカードはもう所持していません！"))
                     else:
@@ -792,7 +789,7 @@ def handle_message(event):
                 line_bot_api.reply_message(event.reply_token, FlexSendMessage("手札情報", gen_hand_json(game.search_user(event.source.user_id).hand, game)))
                 current = game.next_user
                 next = game.next()
-                make_pkl(game, f"uno/{game.id}_uno")
+                make_pkl(game, f"uno/../pkl/{game.id}_uno")
                 line_bot_api.push_message(next, FlexSendMessage("手札情報", gen_hand_json(game.search_user(next).hand, game)))
                 line_bot_api.push_message(game.id, FlexSendMessage("場札情報", gen_deck_info_json(line_bot_api.get_profile(current).display_name, line_bot_api.get_profile(next).display_name, game, [f"{line_bot_api.get_profile(current).display_name}さんが{draw_num}枚ドローしました！", f"残り枚数: {len(game.search_user(current).hand)}"])))
             
@@ -807,14 +804,14 @@ def handle_message(event):
                 line_bot_api.push_message(game.id, FlexSendMessage("場札情報", gen_deck_info_json(line_bot_api.get_profile(current).display_name, line_bot_api.get_profile(next).display_name, game, [f"残り枚数: {len(game.search_user(current).hand)}"])))
                 game.prev_trush.clear()
                 game.status = "START"
-                make_pkl(game, f"uno/{game.id}_uno")
+                make_pkl(game, f"../pkl/uno/{game.id}_uno")
                 line_bot_api.push_message(next, FlexSendMessage("手札情報", gen_hand_json(game.search_user(next).hand, game)))
-            elif re.match("https://twitter.com/.*", command):
+            elif re.match("https://x.com/.*", command):
                 oneshot = True
                 message_send = True
                 line_bot_api.reply_message(
                     event.reply_token,
-                    TextSendMessage(text = command.replace('twitter', 'x')))
+                    TextSendMessage(text = command.replace('x', 'twitter')))
             else:
                 message_send = True
         

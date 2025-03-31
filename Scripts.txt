@@ -1,0 +1,7 @@
+screen -R bot uvicorn main_:app --host 157.7.214.224 --port 443 --ssl-keyfile /etc/letsencrypt/live/sclas.xyz/privkey.pem --ssl-certfile /etc/letsencrypt/live/sclas.xyz/fullchain.pem
+
+screen -S liff gunicorn --config settings.py
+
+screen -R react serve  --ssl-cert /etc/letsencrypt/live/sclas.xyz/fullchain.pem --ssl-key /etc/letsencrypt/live/sclas.xyz/privkey.pem -s ./build
+
+screen -S web gunicorn --config settings.py

@@ -1,11 +1,15 @@
 test/
 env/
 img/
+imgs/
 yugioh_url/
-templates
+templates/
 __pycache__/
 .vscode/
+.venv/
 settings.py
 sec.py
 *.pkl
+*.csv
+test.*
 kaita_urls

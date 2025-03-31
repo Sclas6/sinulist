@@ -1,8 +1,11 @@
 import dropbox
-from file_mng import *
-from sec import *
 from math import ceil
 import datetime
+import sys
+sys.path.append('/root/py/kakumono/tools')
+from file_mng import *
+sys.path.append('/root/py/kakumono/bot')
+from sec import *
 
 def gen_json(contents, title):
     contain = 10

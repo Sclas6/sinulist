@@ -101,6 +101,7 @@ def get_card_img_2(type = None):
     w = [612, 746, 705, 1739, 1479, 1999, 5, 1645, 2102, 86, 66, 44]
     categories = copy.deepcopy(categories_type)
     mode = "type"
+    category = None
     if dt.weekday() == 0:
         categories = copy.deepcopy(categories_rare)
         mode = "rare"
@@ -112,7 +113,9 @@ def get_card_img_2(type = None):
     elif dt.weekday() == 3:
         w[2] *= 15
     elif dt.weekday() == 4:
-        w[3] *= 15
+        "w[3] *= 15"
+        mode = "other"
+        category = "437616"
     elif dt.weekday() == 5:
         w[4] *= 15
         w[5] *= 15
@@ -121,7 +124,8 @@ def get_card_img_2(type = None):
         categories = copy.deepcopy(categories_rare)
         mode = "rare"
         w = [0, 0, 0, 1, 0, 0, 0]
-    category = random.choices(categories, weights=w)[0]
+    if category is None:
+        category = random.choices(categories, weights=w)[0]
     if type != None:
         category = type
 
@@ -131,3 +135,44 @@ def get_card_img_2(type = None):
         size = len(data)
         index = random.randint(0, size - 1)
         return tuple(data[index])
+
+def gen_poke_json(urls: list):
+    carousel = dict()
+    carousel["type"] = "carousel"
+    carousel["contents"] = list()
+    for url in urls:
+        content = {
+            "type": "bubble",
+            "hero": {
+                "type": "image",
+                "url": url,
+                "size": "full",
+                "position": "relative",
+                "aspectRatio": "311:440"
+            }
+        }
+        carousel["contents"].append(content)
+    return carousel
+
+def get_card_img_poke():
+    is_god = True if random.randint(1, 100000) <= 50 else False
+    categories = ["645035", "645036", "645037", "645038", "645039", "645040", "645041", "645042"]
+    w = [[100, 0, 0, 0, 0, 0, 0, 0],
+         [100, 0, 0, 0, 0, 0, 0, 0],
+         [100, 0, 0, 0, 0, 0, 0, 0],
+         [0, 90000, 5000, 1666, 2572, 500, 222, 40],
+         [0, 60000, 20000, 6664, 10288, 2000, 888, 160]]
+    urls = []
+    for i in range(5):
+        if is_god:
+            weight = [0, 0, 0, 0, 40, 50, 5, 5]
+        else:
+            weight = w[i]
+        category = random.choices(categories, weights=weight)[0]
+        path = f"csv_poke/{category}.csv"
+        with open(path, "r", encoding="UTF-8") as f:
+            data = list(csv.reader(f))
+            size = len(data)
+            index = random.randint(0, size - 1)
+            urls.append(data[index][0])
+    return gen_poke_json(urls)

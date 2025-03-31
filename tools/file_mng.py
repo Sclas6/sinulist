@@ -7,10 +7,13 @@ import pickle
 import pandas as pd
 import time
 import uuid
+import sys
+sys.path.append('/root/py/kakumono/tools')
 import yugioh
 
 class Room():
     def __init__(self):
+        self.groups = dict()
         self.sinulist = dict()
         self.kaitamono = ""
         self.kaitalist = dict()
@@ -26,7 +29,7 @@ class Room():
         self.drow_history = None
 
     def save2pkl(self):
-        with open("RoomInfo.pkl", "wb") as f:
+        with open("../pkl/RoomInfo.pkl", "wb") as f:
             pickle.dump(self, f)
 
     def rm_kawaikunai(self, name: str):
@@ -74,7 +77,7 @@ class Room():
             self.drow_history = pd.concat([self.drow_history, df_new])
         return card
 
-    def gen_graph_json(self):
+    def gen_graph_json(self, folder: str):
         df: pd.DataFrame = self.drow_history
         """for i, date in enumerate(reversed(df.index)):
             if (df.index[-1] - date) / datetime.timedelta(days=1) > 1:
@@ -91,19 +94,19 @@ class Room():
         df_all = df
         df_all.plot()
         img_name_all = str(time.time()).replace('.', '').ljust(17, '0')
-        images = [file for file in sorted(os.listdir("img"), reverse=True) if file[:4] == "drow"]
+        images = [file for file in sorted(os.listdir(f"{folder}img"), reverse=True) if file[:4] == "drow"]
         for i, file in enumerate(images):
-            if i >= 4: os.remove(f"img/{file}")
+            if i >= 4: os.remove(f"{folder}img/{file}")
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0, fontsize=18)
-        plt.savefig(f"img/drow_{img_name_all}.png", bbox_inches='tight')
+        plt.savefig(f"{folder}img/drow_{img_name_all}.png", bbox_inches='tight')
         df_diff = df.diff(periods=7)[-7:]
         df_diff.plot.barh()
         img_name_diff = str(time.time()).replace('.', '').ljust(17, '0')
-        images = [file for file in sorted(os.listdir("img"), reverse=True) if file[:4] == "drow"]
+        images = [file for file in sorted(os.listdir(f"{folder}img"), reverse=True) if file[:4] == "drow"]
         for i, file in enumerate(images):
-            if i >= 4: os.remove(f"img/{file}")
+            if i >= 4: os.remove(f"{folder}img/{file}")
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0, fontsize=18)
-        plt.savefig(f"img/drow_{img_name_diff}.png", bbox_inches='tight')
+        plt.savefig(f"{folder}img/drow_{img_name_diff}.png", bbox_inches='tight')
         content = {
             "type": "carousel",
                 "contents": [
@@ -124,7 +127,7 @@ class Room():
                     },
                     "hero": {
                         "type": "image",
-                        "url": f"https://sclas.xyz/img/drow_{img_name_diff}.png",
+                        "url": f"https://sclas.xyz:10710/img/drow_{img_name_diff}.png",
                         "size": "full",
                         "aspectMode": "fit",
                         "aspectRatio": "20:10"
@@ -159,7 +162,7 @@ class Room():
                     },
                     "hero": {
                         "type": "image",
-                        "url": f"https://sclas.xyz/img/drow_{img_name_all}.png",
+                        "url": f"https://sclas.xyz:10710/img/drow_{img_name_all}.png",
                         "size": "full",
                         "aspectMode": "fit",
                         "aspectRatio": "20:10"
@@ -181,101 +184,33 @@ class Room():
         }
         return content
 
-    def gen_onnna_json(self):
-        soup = bs4.BeautifulSoup("<!DOCTYPE HTML>", 'html.parser')
-
-        tag_html = soup.new_tag("html")
-        tag_head = soup.new_tag("head")
-        tag_meta = soup.new_tag("meta")
-        tag_meta["charset"] = "UTF-8"
-        tag_meta["http-equiv"] = "Cache-Control"
-        tag_meta["content"] = "no-store"
-        tag_title = soup.new_tag("title")
-        tag_title.string = "可愛い女デッキ"
-        tag_body = soup.new_tag("body")
-
-        soup.append(tag_html)
-        soup.html.append(tag_head)
-        soup.html.head.append(tag_meta)
-        soup.html.head.append(tag_title)
-        soup.html.append(tag_body)
+    def gen_onnna_api(self):
+        js = dict()
+        js["urls"] = list()
         for card in self.kawaii:
-            tag_img = soup.new_tag("img")
-            tag_img["src"] = card[0]
-            soup.html.body.append(tag_img)
-        return str(soup)
+            js["urls"].append(card[0])
+        return js
 
-    def gen_kakkoii_json(self):
-        soup = bs4.BeautifulSoup("<!DOCTYPE HTML>", 'html.parser')
-
-        tag_html = soup.new_tag("html")
-        tag_head = soup.new_tag("head")
-        tag_meta = soup.new_tag("meta")
-        tag_meta["charset"] = "UTF-8"
-        tag_meta["http-equiv"] = "Cache-Control"
-        tag_meta["content"] = "no-store"
-        tag_title = soup.new_tag("title")
-        tag_title.string = "かっこいいデッキ"
-        tag_body = soup.new_tag("body")
-
-        soup.append(tag_html)
-        soup.html.append(tag_head)
-        soup.html.head.append(tag_meta)
-        soup.html.head.append(tag_title)
-        soup.html.append(tag_body)
+    def gen_kakkoii_api(self):
+        js = dict()
+        js["urls"] = list()
         for card in self.kakkoii:
-            tag_img = soup.new_tag("img")
-            tag_img["src"] = card[0]
-            soup.html.body.append(tag_img)
-        return str(soup)
+            js["urls"].append(card[0])
+        return js
 
-    def gen_tuyosou_json(self):
-        soup = bs4.BeautifulSoup("<!DOCTYPE HTML>", 'html.parser')
-
-        tag_html = soup.new_tag("html")
-        tag_head = soup.new_tag("head")
-        tag_meta = soup.new_tag("meta")
-        tag_meta["charset"] = "UTF-8"
-        tag_meta["http-equiv"] = "Cache-Control"
-        tag_meta["content"] = "no-store"
-        tag_title = soup.new_tag("title")
-        tag_title.string = "つよそうデッキ"
-        tag_body = soup.new_tag("body")
-
-        soup.append(tag_html)
-        soup.html.append(tag_head)
-        soup.html.head.append(tag_meta)
-        soup.html.head.append(tag_title)
-        soup.html.append(tag_body)
+    def gen_tuyosou_api(self):
+        js = dict()
+        js["urls"] = list()
         for card in self.tuyosou:
-            tag_img = soup.new_tag("img")
-            tag_img["src"] = card[0]
-            soup.html.body.append(tag_img)
-        return str(soup)
+            js["urls"].append(card[0])
+        return js
 
-    def gen_yowasou_json(self):
-        soup = bs4.BeautifulSoup("<!DOCTYPE HTML>", 'html.parser')
-
-        tag_html = soup.new_tag("html")
-        tag_head = soup.new_tag("head")
-        tag_meta = soup.new_tag("meta")
-        tag_meta["charset"] = "UTF-8"
-        tag_meta["http-equiv"] = "Cache-Control"
-        tag_meta["content"] = "no-store"
-        tag_title = soup.new_tag("title")
-        tag_title.string = "よわそうデッキ"
-        tag_body = soup.new_tag("body")
-
-        soup.append(tag_html)
-        soup.html.append(tag_head)
-        soup.html.head.append(tag_meta)
-        soup.html.head.append(tag_title)
-        soup.html.append(tag_body)
+    def gen_yowasou_api(self):
+        js = dict()
+        js["urls"] = list()
         for card in self.yowasou:
-            tag_img = soup.new_tag("img")
-            tag_img["src"] = card[0]
-            soup.html.body.append(tag_img)
-        return str(soup)
+            js["urls"].append(card[0])
+        return js
 
 
 class Counter:
@@ -302,8 +237,8 @@ def make_pkl(var, name):
         with open(f"{name}.pkl", "wb") as f:
             pickle.dump(var, f)
 
-def organize_files():
-    files = os.listdir("img")
+def organize_files(folder):
+    files = os.listdir(f"{folder}img")
     for i, file in enumerate(sorted(files, reverse = True)):
         #if i >= 10: os.remove(f"img/{file}")
         pass

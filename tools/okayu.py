@@ -1,3 +1,5 @@
+import sys
+sys.path.append('/root/py/kakumono/tools')
 from file_mng import *
 
 def okayu_up(list, key, value):
