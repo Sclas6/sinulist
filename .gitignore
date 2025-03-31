@@ -12,4 +12,5 @@ sec.py
 *.pkl
 *.csv
 test.*
+Scripts.txt
 kaita_urls
